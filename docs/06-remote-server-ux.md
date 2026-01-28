@@ -55,10 +55,15 @@ User → IAP → Authenticate (SSO/Google/etc.) → tabs-server
 
 ### Same Design Language as Local UI
 
-- Uses same color palette, typography, spacing
+- Uses same typography, spacing, and grid system as local UI
 - Consistent component library (Shadcn UI)
 - Same animations and micro-interactions
 - Users feel at home switching between local and remote
+
+**Accent Color Variation:**
+- **Local UI:** Amber (#d97706) - warm, personal
+- **Remote UI:** Emerald (#059669) - shared, collaborative
+- This subtle distinction helps users know which context they're in
 
 ### Key Visual Differences
 

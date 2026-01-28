@@ -1,18 +1,8 @@
 # Local UI Flows Specification: tabs
 
-**Version:** 1.0
+**Version:** 2.0
 **Date:** 2026-01-28
 **Status:** SPEC
-
-> **⚠️ IMPORTANT: Design System Update**
->
-> The visual design language (typography, colors, animations) in this document has been superseded by **docs/07-frontend-design-brief.md**.
->
-> **Use this document (05) for:** Page layouts, component structure, user flows
->
-> **Use doc 07 for:** Typography (DM Serif Display + IBM Plex Sans), colors (vinyl & mahogany palette), animations (musical micro-interactions), spacing system
->
-> When there's a conflict, doc 07 wins.
 
 ---
 
@@ -37,92 +27,154 @@ This document specifies the user experience for the local tabs web UI running at
 
 ---
 
+## Design Philosophy: "Sheet Music for AI"
+
+tabs isn't just another transcript viewer—it's a **tablature reader for AI conversations**. Like guitar tabs share the fingerwork behind a song, tabs shares the prompts and reasoning behind great code.
+
+**Core Aesthetic:** Editorial minimalism with musical details. Clean layouts inspired by sheet music, music software, and vinyl record liner notes.
+
+**Memorable Element:** Musical notation-inspired micro-interactions and typography that feels like reading beautifully typeset sheet music.
+
+---
+
 ## Visual Design Language
 
-### Color Palette
+### Typography System
 
-**Light Mode (Default):**
+**Display Font (Headings, UI Chrome):**
+- **Primary:** [DM Serif Display](https://fonts.google.com/specimen/DM+Serif+Display)
+- **Fallback:** Georgia, serif
+- **Usage:** Page titles, session titles, modal headers
+- **Why:** Evokes printed music scores and vintage record sleeves
+
+**Body Font (Messages, Content):**
+- **Primary:** [IBM Plex Sans](https://fonts.google.com/specimen/IBM+Plex+Sans)
+- **Fallback:** -apple-system, system-ui, sans-serif
+- **Usage:** Message text, descriptions, body copy
+- **Why:** Technical precision meets approachability
+
+**Code Font (Tool Interactions, JSON):**
+- **Primary:** [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono)
+- **Fallback:** 'Fira Code', 'Monaco', 'Consolas', monospace
+- **Usage:** Code blocks, API responses, tool parameters
+
+**Sizes (Fluid Typography):**
 ```css
---background: #ffffff
---foreground: #0a0a0a
---muted: #f5f5f5
---muted-foreground: #737373
---accent: #f5f5f5
---accent-foreground: #0a0a0a
---border: #e5e5e5
+--font-display: 'DM Serif Display', Georgia, serif;
+--font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+--font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
---primary: #2563eb     /* Blue for actions */
---primary-hover: #1d4ed8
---success: #16a34a     /* Green for success states */
---error: #dc2626       /* Red for errors */
---warning: #ea580c     /* Orange for warnings */
+/* Display */
+--text-display: clamp(2rem, 5vw, 3.5rem);      /* 32-56px */
+--text-h1: clamp(1.75rem, 4vw, 2.5rem);        /* 28-40px */
+--text-h2: clamp(1.5rem, 3vw, 2rem);           /* 24-32px */
+--text-h3: clamp(1.25rem, 2.5vw, 1.75rem);     /* 20-28px */
+
+/* Body */
+--text-base: 1rem;           /* 16px */
+--text-sm: 0.875rem;         /* 14px */
+--text-xs: 0.75rem;          /* 12px */
+--text-lg: 1.125rem;         /* 18px */
+
+/* Line Heights */
+--leading-tight: 1.2;
+--leading-normal: 1.5;
+--leading-relaxed: 1.75;
 ```
 
-**Dark Mode:**
-```css
---background: #0a0a0a
---foreground: #fafafa
---muted: #171717
---muted-foreground: #a3a3a3
---accent: #171717
---accent-foreground: #fafafa
---border: #262626
+### Color Palette: "Vinyl & Mahogany"
 
---primary: #3b82f6
---primary-hover: #2563eb
---success: #22c55e
---error: #ef4444
---warning: #f97316
+**Inspiration:** Vintage audio equipment, warm studio lighting, aged paper
+
+**Light Theme (Default):**
+```css
+/* Base */
+--bg-primary: #faf9f7;        /* Warm off-white, like aged paper */
+--bg-secondary: #f0ede8;      /* Subtle cream */
+--fg-primary: #1a1614;        /* Rich near-black */
+--fg-secondary: #524c47;      /* Warm gray */
+--fg-tertiary: #857d77;       /* Muted taupe */
+
+/* Accent: Amber (like warm studio lighting) */
+--accent: #d97706;            /* Rich amber */
+--accent-hover: #b45309;      /* Deeper amber */
+--accent-subtle: #fef3c7;     /* Light amber wash */
+
+/* Semantic */
+--border: #e0dbd5;            /* Soft divider */
+--success: #059669;           /* Emerald */
+--error: #dc2626;             /* Red */
+--warning: #d97706;           /* Amber */
+
+/* Code Highlighting (warm, muted tones) */
+--syntax-bg: #f5f2ed;
+--syntax-comment: #9ca3af;
+--syntax-keyword: #b45309;    /* Amber */
+--syntax-string: #059669;     /* Emerald */
+--syntax-function: #2563eb;   /* Blue */
 ```
 
-### Typography
-
+**Dark Theme: "Night Studio"**
 ```css
---font-sans: 'Inter', system-ui, sans-serif
---font-mono: 'JetBrains Mono', 'Fira Code', monospace
+/* Base */
+--bg-primary: #0f0e0d;        /* Deep warm black */
+--bg-secondary: #1a1816;      /* Slightly lighter */
+--fg-primary: #f5f2ed;        /* Warm off-white */
+--fg-secondary: #c7c0b8;      /* Warm light gray */
+--fg-tertiary: #857d77;       /* Muted taupe */
 
-/* Sizes */
---text-xs: 0.75rem     /* 12px */
---text-sm: 0.875rem    /* 14px */
---text-base: 1rem      /* 16px */
---text-lg: 1.125rem    /* 18px */
---text-xl: 1.25rem     /* 20px */
---text-2xl: 1.5rem     /* 24px */
---text-3xl: 1.875rem   /* 30px */
+/* Accent: Warm Gold */
+--accent: #f59e0b;            /* Gold */
+--accent-hover: #fbbf24;      /* Brighter gold */
+--accent-subtle: #78350f;     /* Dark amber */
+
+/* Semantic */
+--border: #2d2a27;
+--success: #10b981;
+--error: #f87171;
+--warning: #fbbf24;
+
+/* Code Highlighting */
+--syntax-bg: #1a1816;
+--syntax-comment: #6b7280;
+--syntax-keyword: #fbbf24;
+--syntax-string: #34d399;
+--syntax-function: #60a5fa;
 ```
 
-### Spacing
+### Spacing & Layout: "Staff Lines"
+
+**Grid System:** 8px base unit (like musical measures)
 
 ```css
---space-1: 0.25rem     /* 4px */
---space-2: 0.5rem      /* 8px */
---space-3: 0.75rem     /* 12px */
---space-4: 1rem        /* 16px */
---space-6: 1.5rem      /* 24px */
---space-8: 2rem        /* 32px */
---space-12: 3rem       /* 48px */
+--space-1: 0.25rem;   /* 4px */
+--space-2: 0.5rem;    /* 8px - base unit */
+--space-3: 0.75rem;   /* 12px */
+--space-4: 1rem;      /* 16px */
+--space-6: 1.5rem;    /* 24px */
+--space-8: 2rem;      /* 32px */
+--space-12: 3rem;     /* 48px */
+--space-16: 4rem;     /* 64px */
+--space-24: 6rem;     /* 96px */
+
+/* Container Widths */
+--container-sm: 640px;
+--container-md: 768px;
+--container-lg: 1024px;
+--container-xl: 1280px;
+--container-content: 65ch;  /* Optimal reading width */
 ```
 
-### Animations
+### Musical Micro-Interactions
 
-**Principles:**
-- Subtle, not distracting
-- Fast (200-300ms)
-- Purposeful (guide attention, indicate state changes)
+**1. Note Animations (Staggered Reveals):**
+Timeline items fade in with slight vertical slide, staggered by 40ms like notes being played in sequence.
 
-**Common Animations:**
 ```css
-/* Fade in */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* Slide up */
-@keyframes slideUp {
+@keyframes noteIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -130,17 +182,133 @@ This document specifies the user experience for the local tabs web UI running at
   }
 }
 
-/* Scale in */
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+.timeline-item {
+  animation: noteIn 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: backwards;
 }
+
+.timeline-item:nth-child(1) { animation-delay: 0ms; }
+.timeline-item:nth-child(2) { animation-delay: 40ms; }
+.timeline-item:nth-child(3) { animation-delay: 80ms; }
+```
+
+**2. Hover States (Crescendo Effect):**
+Cards and buttons scale slightly and lift with shadow on hover.
+
+```css
+.session-card {
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.session-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+```
+
+**3. Click Feedback (Staccato):**
+Brief scale-down on click before navigation.
+
+```css
+.session-card:active {
+  transform: scale(0.98);
+  transition-duration: 100ms;
+}
+```
+
+**4. Loading States (Metronome Pulse):**
+Subtle pulsing animation for loading indicators.
+
+```css
+@keyframes metronome {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.loading {
+  animation: metronome 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+```
+
+**5. Search Input (Focus Crescendo):**
+When search is focused, border color transitions smoothly and a subtle glow appears.
+
+```css
+.search-input {
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+```
+
+### Musical Details: Custom Icons
+
+**Guitar Pick Icon (instead of generic dots):**
+```svg
+<svg viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 2L8 8L6 12L8 16L12 22L16 16L18 12L16 8L12 2Z" opacity="0.9"/>
+</svg>
+```
+
+**Metronome Icon (for loading):**
+```svg
+<svg viewBox="0 0 24 24" fill="currentColor">
+  <path d="M12 4L8 20H16L12 4Z"/>
+  <circle cx="12" cy="10" r="2"/>
+</svg>
+```
+
+### Tailwind Configuration
+
+```js
+// tailwind.config.js
+module.exports = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        display: ['DM Serif Display', 'Georgia', 'serif'],
+        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+      colors: {
+        bg: {
+          primary: 'var(--bg-primary)',
+          secondary: 'var(--bg-secondary)',
+        },
+        fg: {
+          primary: 'var(--fg-primary)',
+          secondary: 'var(--fg-secondary)',
+          tertiary: 'var(--fg-tertiary)',
+        },
+        accent: {
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
+          subtle: 'var(--accent-subtle)',
+        },
+        border: 'var(--border)',
+      },
+      animation: {
+        'note-in': 'noteIn 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+        'metronome': 'metronome 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        noteIn: {
+          from: { opacity: 0, transform: 'translateY(12px)' },
+          to: { opacity: 1, transform: 'translateY(0)' },
+        },
+        metronome: {
+          '0%, 100%': { opacity: 0.3 },
+          '50%': { opacity: 1 },
+        },
+      },
+    },
+  },
+};
 ```
 
 ---
@@ -163,7 +331,7 @@ This document specifies the user experience for the local tabs web UI running at
 ```
 
 **Header:**
-- Logo: "tabs" with music note icon (🎵 or guitar pick)
+- Logo: "tabs" with guitar pick icon (custom SVG)
 - Navigation: Home, Settings
 - Search bar (always visible)
 - Theme toggle (light/dark)
@@ -771,38 +939,42 @@ Stats: 12 messages · 8 tools · 3 files changed
 
 ## Whimsical Touches
 
-### Music Theme
+### Music Theme Details
 
 **Logo:**
-- Guitar pick icon or music note (🎵)
-- Subtle rotation on hover
-- Click to play a note sound (optional, toggleable)
+- Custom guitar pick SVG icon (see Visual Design Language section)
+- Subtle rotation on hover (3deg)
+- DM Serif Display font for "tabs" wordmark
 
 **Loading States:**
-- Loading spinner could be rotating guitar pick
-- Or music note bouncing
+- Metronome pulse animation (see Musical Micro-Interactions)
+- Rotating guitar pick for longer operations
 
 **Success Animations:**
-- Share success: confetti (brief, 1 second)
-- Copy success: checkmark with bounce
+- Share success: Brief scale pulse (200ms)
+- Copy success: Checkmark with bounce
 
-### Micro-interactions
+**Empty States:**
+- Animated guitar icon that "strums" on hover
+- Warm, friendly copy
 
-**Session Cards:**
-- Slight lift on hover (box shadow grows)
-- Smooth transition (200ms ease-out)
+### Musical Micro-interactions Summary
 
-**Buttons:**
-- Scale down on click (0.95)
-- Ripple effect on primary buttons
+**Staggered Reveals:**
+- Timeline items: 40ms delay per item (like notes being played)
 
-**Thinking Blocks:**
-- Expand/collapse with smooth height transition
-- Icon rotates 180° when expanding
+**Crescendo Effects:**
+- Hover states: lift + shadow grow
+- Focus states: glow effect
 
-**Code Blocks:**
-- Copy button fades in on hover
-- Success checkmark replaces button briefly when copied
+**Staccato Clicks:**
+- Brief scale-down on click (0.98)
+- 100ms transition
+
+**Metronome Pulse:**
+- Loading states pulse at 1.2s intervals
+
+See "Musical Micro-Interactions" section above for implementation details.
 
 ---
 

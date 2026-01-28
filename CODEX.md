@@ -2,16 +2,16 @@
 
 You are implementing the tabs project according to the specifications in docs/.
 
-## CRITICAL: Design System
+## Design Philosophy
 
-**When implementing UI (Phase 2 & 3), you MUST follow:**
-- **docs/07-frontend-design-brief.md** - The definitive design system
-  - Typography: DM Serif Display + IBM Plex Sans (NOT Inter!)
-  - Colors: Warm "vinyl & mahogany" palette with amber accents
-  - Musical theme with guitar pick icons and staff line spacing
-  - Animations: Musical micro-interactions (staggered notes, metronome pulse)
+**Musical Theme:** tabs = guitar tablatures. The UI should feel like reading beautifully typeset sheet music.
 
-**DO NOT use** the generic design from docs/05-local-ui-flows.md. That doc has page layouts, but doc 07 has the correct visual design language.
+**When implementing UI (Phase 2 & 3):**
+- Typography: DM Serif Display (headings) + IBM Plex Sans (body) - see docs/05
+- Colors: Warm "vinyl & mahogany" palette with amber accents (#d97706)
+- Musical micro-interactions: staggered reveals (40ms), crescendo hovers, metronome pulse
+- Custom guitar pick icon (not generic dots)
+- 8px grid system (like musical staff lines)
 
 ## Your Task
 
@@ -19,7 +19,6 @@ You are implementing the tabs project according to the specifications in docs/.
 2. Read `progress.txt` to see what has been learned so far
 3. Find the next story where `passes: false` (lowest priority number)
 4. Implement that story following the specs in docs/
-   - **For UI stories:** Use design system from docs/07-frontend-design-brief.md
 5. Run quality checks:
    - `make build` - must succeed
    - `make test` - must pass (once tests exist)
