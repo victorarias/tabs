@@ -10,9 +10,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -326,9 +328,15 @@ func sendSocketRequest(req request) (*response, error) {
 		return nil, err
 	}
 
-	conn, err := net.DialTimeout("unix", path, 2*time.Second)
+	conn, err := dialDaemon(path)
 	if err != nil {
-		return nil, fmt.Errorf("connect daemon: %w", err)
+		if startErr := ensureDaemonRunning(); startErr != nil {
+			return nil, fmt.Errorf("start daemon: %w", startErr)
+		}
+		conn, err = dialDaemon(path)
+		if err != nil {
+			return nil, fmt.Errorf("connect daemon: %w", err)
+		}
 	}
 	defer conn.Close()
 
@@ -356,6 +364,125 @@ func sendSocketRequest(req request) (*response, error) {
 		return nil, err
 	}
 	return &resp, nil
+}
+
+func dialDaemon(path string) (net.Conn, error) {
+	return net.DialTimeout("unix", path, 2*time.Second)
+}
+
+func ensureDaemonRunning() error {
+	baseDir, err := daemonBaseDir()
+	if err != nil {
+		return err
+	}
+	pidPath := filepath.Join(baseDir, "daemon.pid")
+	socketPath := filepath.Join(baseDir, "daemon.sock")
+
+	alive, pid, err := daemonPIDAlive(pidPath)
+	if err != nil {
+		return err
+	}
+	if alive {
+		if err := waitForSocket(socketPath, 2*time.Second); err == nil {
+			return nil
+		}
+		return fmt.Errorf("daemon running (pid %d) but socket unavailable", pid)
+	}
+
+	if err := os.MkdirAll(baseDir, 0o700); err != nil {
+		return err
+	}
+
+	daemonPath, err := findDaemonBinary()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command(daemonPath)
+	logFile, err := os.OpenFile(filepath.Join(baseDir, "daemon.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err == nil {
+		cmd.Stdout = logFile
+		cmd.Stderr = logFile
+	} else {
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
+	}
+
+	if err := cmd.Start(); err != nil {
+		if logFile != nil {
+			_ = logFile.Close()
+		}
+		return err
+	}
+	if cmd.Process != nil {
+		_ = cmd.Process.Release()
+	}
+	if logFile != nil {
+		_ = logFile.Close()
+	}
+
+	return waitForSocket(socketPath, 2*time.Second)
+}
+
+func daemonBaseDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".tabs"), nil
+}
+
+func daemonPIDAlive(pidPath string) (bool, int, error) {
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, 0, nil
+		}
+		return false, 0, err
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil || pid <= 0 {
+		return false, 0, nil
+	}
+	if err := syscall.Kill(pid, 0); err != nil {
+		if errors.Is(err, syscall.ESRCH) {
+			return false, 0, nil
+		}
+		if errors.Is(err, syscall.EPERM) {
+			return true, pid, nil
+		}
+		return false, 0, err
+	}
+	return true, pid, nil
+}
+
+func waitForSocket(path string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("unix", path, 200*time.Millisecond)
+		if err == nil {
+			_ = conn.Close()
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("daemon socket did not appear at %s", path)
+}
+
+func findDaemonBinary() (string, error) {
+	if path, err := exec.LookPath("tabs-daemon"); err == nil {
+		return path, nil
+	}
+	exe, err := os.Executable()
+	if err == nil {
+		dir := filepath.Dir(exe)
+		candidate := filepath.Join(dir, "tabs-daemon")
+		if info, statErr := os.Stat(candidate); statErr == nil && !info.IsDir() {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("tabs-daemon binary not found in PATH")
 }
 
 func formatResponseError(resp *response) error {

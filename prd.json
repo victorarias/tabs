@@ -18,7 +18,7 @@
       "title": "Implement daemon lifecycle and IPC",
       "description": "Implement daemon auto-start, PID file management with daemon.lock, unix socket server, and graceful shutdown.",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Daemon auto-starts when CLI calls it",
         "PID file with atomic lock prevents multiple instances",

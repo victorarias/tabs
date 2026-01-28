@@ -7,3 +7,5 @@ This file tracks learnings and progress across Ralph iterations.
 - Implemented tabs-cli capture/status/config with Unix socket requests, JSON protocol, and TOML config read/write.
 - Added config key normalization + validation (https server_url, tabs_ api_key, port/log level bounds) and default config rendering.
 - Build/test/vet required setting GOCACHE and GOMODCACHE to /tmp due to permission error writing to ~/.cache/go-build.
+- Added tabs-daemon core (PID/lock files, unix socket server, graceful shutdown) with status/capture handlers and CLI auto-start/retry logic.
+- Sandbox note: ~/.tabs is not writable here; run manual tests with `HOME=/tmp/tabs-home` to let daemon/CLI create pid/socket/log files.
