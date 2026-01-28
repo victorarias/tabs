@@ -377,10 +377,42 @@ github.com/gorilla/mux           // HTTP router (or use stdlib)
 4. Verify events captured
 
 **Remote System:**
-1. Push session from CLI
-2. Verify stored in PostgreSQL
-3. Query via API
-4. Verify displayed in UI
+
+**CRITICAL:** Use Docker Compose for PostgreSQL during development and testing.
+
+Create `docker-compose.yml` in project root:
+```yaml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tabs
+      POSTGRES_USER: tabs
+      POSTGRES_PASSWORD: tabs_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tabs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+```
+
+**Test workflow:**
+1. Start PostgreSQL: `docker compose up -d`
+2. Wait for healthy: `docker compose ps` (should show "healthy")
+3. Run migrations: `tabs-server migrate` (or embedded migrations on startup)
+4. Push session from CLI
+5. Verify stored in PostgreSQL: `docker compose exec postgres psql -U tabs -c "SELECT COUNT(*) FROM sessions;"`
+6. Query via API
+7. Verify displayed in UI
+8. Stop database: `docker compose down` (or `docker compose down -v` to wipe data)
 
 ### Browser Tests (Playwright)
 

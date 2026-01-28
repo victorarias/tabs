@@ -30,6 +30,15 @@ log_error() {
     echo -e "${RED}[Ralph Test]${NC} $1"
 }
 
+# Handle Ctrl+C gracefully
+cleanup() {
+    echo ""
+    log_error "Test interrupted by user"
+    exit 130
+}
+
+trap cleanup SIGINT SIGTERM
+
 log_info "Starting Ralph test with trivial task..."
 log_info "PRD: $PRD_FILE"
 log_info "Prompt: $PROMPT_FILE"

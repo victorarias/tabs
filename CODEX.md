@@ -24,6 +24,10 @@ You are implementing the tabs project according to the specifications in docs/.
    - `make test` - must pass (once tests exist)
    - `go vet ./...` - must pass
    - **For UI stories**: Use Playwright to verify browser functionality works
+   - **For remote server stories**: Use Docker Compose for PostgreSQL
+     - Start: `docker compose up -d`
+     - Test migrations and API
+     - Stop: `docker compose down`
 6. If checks pass:
    - Commit your changes with a clear commit message
    - Update `prd.json`: set `passes: true` for the completed story

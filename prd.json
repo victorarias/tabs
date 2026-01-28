@@ -1,0 +1,102 @@
+{
+  "branchName": "ralph/tabs-implementation",
+  "stories": [
+    {
+      "id": "phase1-cli",
+      "title": "Implement tabs-cli commands",
+      "description": "Implement core CLI commands: capture, status, config. Parse flags and communicate with daemon via unix socket.",
+      "priority": 1,
+      "passes": false,
+      "acceptance": [
+        "tabs-cli capture --session-id <id> --event <json> sends event to daemon",
+        "tabs-cli status shows daemon status",
+        "tabs-cli config --set key=value persists configuration"
+      ]
+    },
+    {
+      "id": "phase1-daemon-core",
+      "title": "Implement daemon lifecycle and IPC",
+      "description": "Implement daemon auto-start, PID file management with daemon.lock, unix socket server, and graceful shutdown.",
+      "priority": 2,
+      "passes": false,
+      "acceptance": [
+        "Daemon auto-starts when CLI calls it",
+        "PID file with atomic lock prevents multiple instances",
+        "Unix socket accepts JSON-LD messages from CLI",
+        "Daemon shuts down cleanly on SIGTERM"
+      ]
+    },
+    {
+      "id": "phase1-daemon-storage",
+      "title": "Implement JSONL storage and deduplication",
+      "description": "Implement event writing to JSONL files with daily folders, per-session cursor state for deduplication, and metadata extraction.",
+      "priority": 3,
+      "passes": false,
+      "acceptance": [
+        "Events written to ~/.tabs/sessions/YYYY-MM-DD/<session-id>-<tool>-<timestamp>.jsonl",
+        "Cursor state prevents duplicate events",
+        "Session metadata extracted and stored"
+      ]
+    },
+    {
+      "id": "phase1-claude-integration",
+      "title": "Claude Code hook integration",
+      "description": "Implement hook script that calls tabs-cli to capture events from Claude Code transcript.",
+      "priority": 4,
+      "passes": false,
+      "acceptance": [
+        "Hook script installs to ~/.claude/hooks/",
+        "Events captured from transcript on project:start and user:prompt-submit",
+        "No duplicate events written"
+      ]
+    },
+    {
+      "id": "phase2-local-webserver",
+      "title": "Implement local web server",
+      "description": "Build HTTP server that reads JSONL files and serves JSON API with CSRF protection.",
+      "priority": 5,
+      "passes": false,
+      "acceptance": [
+        "Server binds to 127.0.0.1 only",
+        "Origin/Host checks prevent CSRF",
+        "API returns sessions, messages, tools from JSONL files"
+      ]
+    },
+    {
+      "id": "phase2-local-ui",
+      "title": "Implement local UI with TanStack Start",
+      "description": "Build SSR React UI for browsing sessions with timeline view, session detail, and search.",
+      "priority": 6,
+      "passes": false,
+      "acceptance": [
+        "Timeline shows sessions grouped by day",
+        "Session detail shows messages and tool interactions",
+        "Search works across sessions"
+      ]
+    },
+    {
+      "id": "phase3-remote-server",
+      "title": "Implement remote server with PostgreSQL",
+      "description": "Build tabs-server that accepts uploads via API key auth and stores in PostgreSQL.",
+      "priority": 7,
+      "passes": false,
+      "acceptance": [
+        "Server accepts POST /api/sessions with API key",
+        "Sessions stored in PostgreSQL with normalization",
+        "uploaded_by derived from api_keys.user_id"
+      ]
+    },
+    {
+      "id": "phase3-remote-ui",
+      "title": "Implement remote UI with tagging",
+      "description": "Build remote UI that displays all uploaded sessions with tag filtering and search.",
+      "priority": 8,
+      "passes": false,
+      "acceptance": [
+        "UI shows all sessions from all users",
+        "Tag-based filtering works",
+        "Search spans all sessions"
+      ]
+    }
+  ]
+}

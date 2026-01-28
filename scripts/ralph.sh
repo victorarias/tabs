@@ -19,6 +19,16 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Handle Ctrl+C gracefully
+cleanup() {
+    echo ""
+    log_warn "Ralph loop interrupted by user"
+    log_info "Progress saved to prd.json and progress.txt"
+    exit 130
+}
+
+trap cleanup SIGINT SIGTERM
+
 log_info() {
     echo -e "${BLUE}[Ralph]${NC} $1"
 }
