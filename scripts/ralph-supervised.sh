@@ -92,7 +92,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
         --output-format stream-json \
         --verbose \
         --permission-mode bypassPermissions \
-        "$(cat "$CLAUDE_PROMPT")" | jq -C '.'); then
+        "$(cat "$CLAUDE_PROMPT")" | jq -C --tab '.'); then
         log_error "Claude Code supervision failed"
         log_warn "Check the output above for errors"
         log_warn "You may need to manually fix issues and resume Ralph"
