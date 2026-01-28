@@ -1,9 +1,9 @@
 # Binaries
 /bin/
 /build/
-tabs-cli
-tabs-daemon
-tabs-server
+/tabs-cli
+/tabs-daemon
+/tabs-server
 *.exe
 *.dll
 *.so
