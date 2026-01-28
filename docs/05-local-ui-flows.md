@@ -4,6 +4,16 @@
 **Date:** 2026-01-28
 **Status:** SPEC
 
+> **⚠️ IMPORTANT: Design System Update**
+>
+> The visual design language (typography, colors, animations) in this document has been superseded by **docs/07-frontend-design-brief.md**.
+>
+> **Use this document (05) for:** Page layouts, component structure, user flows
+>
+> **Use doc 07 for:** Typography (DM Serif Display + IBM Plex Sans), colors (vinyl & mahogany palette), animations (musical micro-interactions), spacing system
+>
+> When there's a conflict, doc 07 wins.
+
 ---
 
 ## Overview

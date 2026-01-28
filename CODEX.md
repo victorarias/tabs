@@ -2,12 +2,24 @@
 
 You are implementing the tabs project according to the specifications in docs/.
 
+## CRITICAL: Design System
+
+**When implementing UI (Phase 2 & 3), you MUST follow:**
+- **docs/07-frontend-design-brief.md** - The definitive design system
+  - Typography: DM Serif Display + IBM Plex Sans (NOT Inter!)
+  - Colors: Warm "vinyl & mahogany" palette with amber accents
+  - Musical theme with guitar pick icons and staff line spacing
+  - Animations: Musical micro-interactions (staggered notes, metronome pulse)
+
+**DO NOT use** the generic design from docs/05-local-ui-flows.md. That doc has page layouts, but doc 07 has the correct visual design language.
+
 ## Your Task
 
 1. Read `prd.json` to see all implementation stories
 2. Read `progress.txt` to see what has been learned so far
 3. Find the next story where `passes: false` (lowest priority number)
 4. Implement that story following the specs in docs/
+   - **For UI stories:** Use design system from docs/07-frontend-design-brief.md
 5. Run quality checks:
    - `make build` - must succeed
    - `make test` - must pass (once tests exist)
