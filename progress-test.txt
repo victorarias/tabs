@@ -1,0 +1,6 @@
+# Tabs Test Implementation Progress
+
+This is a test run of the Ralph loop with a trivial task.
+
+
+✓ Added hello package with Greet function

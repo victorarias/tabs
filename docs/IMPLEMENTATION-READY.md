@@ -180,6 +180,17 @@ npm run dev
 # Open http://localhost:3000
 ```
 
+**Verify with Playwright:**
+```javascript
+// Use Playwright to verify UI works
+await page.goto('http://localhost:3000');
+await expect(page.getByRole('heading', { name: /sessions/i })).toBeVisible();
+// Click first session
+await page.getByRole('button', { name: /view session/i }).first().click();
+// Verify session detail loads
+await expect(page.getByRole('heading', { level: 2 })).toBeVisible();
+```
+
 ---
 
 ### Phase 3: Remote Server
@@ -371,13 +382,44 @@ github.com/gorilla/mux           // HTTP router (or use stdlib)
 3. Query via API
 4. Verify displayed in UI
 
+### Browser Tests (Playwright)
+
+**CRITICAL: All UI features MUST be verified with Playwright browser automation.**
+
+**Local UI:**
+1. Start local web server
+2. Use Playwright to:
+   - Navigate to `http://localhost:3787`
+   - Verify timeline shows sessions
+   - Click a session card → verify session detail loads
+   - Verify messages render correctly
+   - Verify tool interactions display
+   - Test search functionality
+   - Test share modal opens and accepts input
+
+**Remote UI:**
+1. Start remote server (or connect to deployed instance)
+2. Use Playwright to:
+   - Navigate to server URL
+   - Verify browse page shows sessions
+   - Click a session → verify detail loads
+   - Test tag filtering
+   - Test search across all sessions
+   - Verify API key management page works
+
+**Why Playwright:**
+- Both Claude Code and Codex have Playwright MCP integration
+- Automated browser testing catches rendering bugs
+- Verifies actual user-facing functionality
+- Can run headless in CI/CD
+
 ### End-to-End Tests
 
 **Full Flow:**
 1. User works in Claude Code
 2. Session captured locally
-3. User shares via UI
-4. Team member views on remote server
+3. User shares via UI (verify with Playwright)
+4. Team member views on remote server (verify with Playwright)
 
 ---
 

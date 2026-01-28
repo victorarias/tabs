@@ -1,0 +1,18 @@
+{
+  "branchName": "ralph/test-run",
+  "stories": [
+    {
+      "id": "test-hello",
+      "title": "Add hello package with greeting function",
+      "description": "Create internal/hello/hello.go with a Greet(name string) function that returns 'Hello, {name}!'",
+      "priority": 1,
+      "passes": true,
+      "acceptance": [
+        "File internal/hello/hello.go exists",
+        "Function Greet(name string) string exists",
+        "Greet(\"World\") returns \"Hello, World!\"",
+        "Package builds successfully"
+      ]
+    }
+  ]
+}
