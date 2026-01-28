@@ -25,6 +25,12 @@ func EnsureBaseDir() (string, error) {
 	if err := os.MkdirAll(base, 0o700); err != nil {
 		return "", err
 	}
+	if err := os.MkdirAll(StateDir(base), 0o700); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(SessionsDir(base), 0o700); err != nil {
+		return "", err
+	}
 	return base, nil
 }
 
@@ -42,4 +48,12 @@ func LockPath(baseDir string) string {
 
 func LogPath(baseDir string) string {
 	return filepath.Join(baseDir, "daemon.log")
+}
+
+func StateDir(baseDir string) string {
+	return filepath.Join(baseDir, "state")
+}
+
+func SessionsDir(baseDir string) string {
+	return filepath.Join(baseDir, "sessions")
 }

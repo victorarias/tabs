@@ -162,8 +162,57 @@ func (s *Server) handleCapture(conn net.Conn, payload json.RawMessage) {
 		}
 	}
 
+	normalized, eventJSON, err := normalizeEvent(req.Event, sessionID, req.Tool, eventTime)
+	if err != nil {
+		s.writeResponse(conn, errorResponse("invalid_payload", "Invalid event payload"))
+		return
+	}
+
 	s.mu.Lock()
-	s.state.RecordEvent(sessionID, eventTime)
+	cursor, cursorErr := loadCursorState(s.baseDir, sessionID)
+	if cursorErr != nil {
+		s.logger.Printf("cursor state load failed for %s: %v", sessionID, cursorErr)
+	}
+	if cursor == nil {
+		s.mu.Unlock()
+		s.writeResponse(conn, errorResponse("storage_error", "Failed to read cursor state"))
+		return
+	}
+
+	lineHash := hashLine(eventJSON)
+	if cursor.LastLineHash == lineHash {
+		s.mu.Unlock()
+		data := map[string]interface{}{
+			"session_id":     sessionID,
+			"events_written": 0,
+		}
+		s.writeResponse(conn, okResponse(data))
+		return
+	}
+
+	sessionPath, err := s.state.EnsureSessionFile(s.baseDir, sessionID, req.Tool, eventTime)
+	if err != nil {
+		s.mu.Unlock()
+		s.writeResponse(conn, errorResponse("storage_error", "Failed to resolve session file"))
+		return
+	}
+
+	lastOffset, err := appendJSONL(sessionPath, eventJSON)
+	if err != nil {
+		s.mu.Unlock()
+		s.writeResponse(conn, errorResponse("storage_error", "Failed to append event"))
+		return
+	}
+
+	meta := extractEventMetadata(normalized)
+	updateCursorState(cursor, meta, normalized, lineHash, lastOffset, sessionPath)
+	if err := saveCursorState(s.baseDir, cursor); err != nil {
+		s.mu.Unlock()
+		s.writeResponse(conn, errorResponse("storage_error", "Failed to update cursor state"))
+		return
+	}
+
+	s.state.RecordEvent(sessionID, eventTime, 1)
 	s.mu.Unlock()
 
 	data := map[string]interface{}{

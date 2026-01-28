@@ -31,7 +31,7 @@
       "title": "Implement JSONL storage and deduplication",
       "description": "Implement event writing to JSONL files with daily folders, per-session cursor state for deduplication, and metadata extraction.",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Events written to ~/.tabs/sessions/YYYY-MM-DD/<session-id>-<tool>-<timestamp>.jsonl",
         "Cursor state prevents duplicate events",
