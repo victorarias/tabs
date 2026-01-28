@@ -80,13 +80,43 @@ kill $DAEMON_PID
 ls -la ~/.claude/hooks/
 cat ~/.claude/hooks/on-user-prompt-submit.sh       # Read the hook script
 
-# Trigger a Claude Code session
-cd /tmp/test-project
-claude "write a hello world function"              # Start real Claude Code session
+# CRITICAL: Test with THREE separate multi-turn Claude Code sessions
+# Session 1: Multi-turn conversation
+cd /tmp/test-project-1
+claude "write a hello world function"
+# Continue the session with follow-up prompts:
+# - "now add a goodbye function"
+# - "write tests for both functions"
+# Exit Claude Code (Ctrl+D or /exit)
 
-# Verify capture worked
-ls ~/.tabs/sessions/$(date +%Y-%m-%d)/             # Should see JSONL file
-cat ~/.tabs/sessions/$(date +%Y-%m-%d)/*.jsonl     # Should see session events
+# Session 2: Different project, multi-turn
+cd /tmp/test-project-2
+claude "create a fibonacci function"
+# Continue:
+# - "optimize it with memoization"
+# - "add error handling"
+# Exit Claude Code
+
+# Session 3: Another project, multi-turn
+cd /tmp/test-project-3
+claude "implement a binary search"
+# Continue:
+# - "add edge case handling"
+# - "write documentation"
+# Exit Claude Code
+
+# Verify ALL THREE sessions captured
+ls ~/.tabs/sessions/$(date +%Y-%m-%d)/             # Should see 3 JSONL files
+wc -l ~/.tabs/sessions/$(date +%Y-%m-%d)/*.jsonl   # Each should have multiple events
+
+# Check session IDs are different
+grep -h "session_id" ~/.tabs/sessions/$(date +%Y-%m-%d)/*.jsonl | sort -u  # Should see 3 unique IDs
+
+# Verify multi-turn captured (each file should have multiple messages)
+for f in ~/.tabs/sessions/$(date +%Y-%m-%d)/*.jsonl; do
+  echo "=== $f ==="
+  grep -c "\"type\":\"message\"" "$f"  # Should be > 1 for multi-turn
+done
 ```
 
 **Phase 2 - Local UI:**
