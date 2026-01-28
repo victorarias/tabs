@@ -90,6 +90,7 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
     if ! (cd "$PROJECT_DIR" && claude \
         --print \
         --output-format stream-json \
+        --verbose \
         --permission-mode bypassPermissions \
         "$(cat "$CLAUDE_PROMPT")"); then
         log_error "Claude Code supervision failed"
