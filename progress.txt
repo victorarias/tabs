@@ -2,3 +2,8 @@
 
 This file tracks learnings and progress across Ralph iterations.
 
+
+## 2026-01-28
+- Implemented tabs-cli capture/status/config with Unix socket requests, JSON protocol, and TOML config read/write.
+- Added config key normalization + validation (https server_url, tabs_ api_key, port/log level bounds) and default config rendering.
+- Build/test/vet required setting GOCACHE and GOMODCACHE to /tmp due to permission error writing to ~/.cache/go-build.

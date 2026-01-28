@@ -6,7 +6,7 @@
       "title": "Implement tabs-cli commands",
       "description": "Implement core CLI commands: capture, status, config. Parse flags and communicate with daemon via unix socket.",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "tabs-cli capture --session-id <id> --event <json> sends event to daemon",
         "tabs-cli status shows daemon status",
