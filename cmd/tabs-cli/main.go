@@ -39,6 +39,8 @@ func main() {
 	switch cmd {
 	case "capture", "capture-event":
 		err = runCapture(args)
+	case "install":
+		err = runInstall(args)
 	case "status":
 		err = runStatus(args)
 	case "config":
@@ -64,10 +66,12 @@ func printUsage() {
 	fmt.Printf("tabs-cli %s (commit: %s, built: %s)\n", Version, Commit, BuildTime)
 	fmt.Println("\nUsage:")
 	fmt.Println("  tabs-cli capture --session-id <id> --event <json> [--tool claude-code]")
+	fmt.Println("  tabs-cli install")
 	fmt.Println("  tabs-cli status")
 	fmt.Println("  tabs-cli config --set key=value")
 	fmt.Println("\nCommands:")
 	fmt.Println("  capture        Send hook event to daemon")
+	fmt.Println("  install        Install Claude Code hook scripts")
 	fmt.Println("  status         Show daemon status")
 	fmt.Println("  config         Manage configuration")
 	fmt.Println("  version        Print version info")
@@ -113,13 +117,17 @@ func runCapture(args []string) error {
 		return err
 	}
 
-	if sessionID == "" {
-		return errors.New("--session-id is required")
-	}
-
 	eventObj, err := readEventObject(eventRaw)
 	if err != nil {
 		return err
+	}
+
+	if sessionID == "" {
+		if existing, ok := eventObj["session_id"].(string); ok && existing != "" {
+			sessionID = existing
+		} else {
+			return errors.New("--session-id is required (or event.session_id)")
+		}
 	}
 
 	if existing, ok := eventObj["session_id"]; ok {
@@ -169,6 +177,69 @@ func runCapture(args []string) error {
 
 	fmt.Printf("Captured session %s (%d events)\n", data.SessionID, data.EventsWritten)
 	return nil
+}
+
+func runInstall(args []string) error {
+	fs := flag.NewFlagSet("install", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var force bool
+	fs.BoolVar(&force, "force", false, "Overwrite existing hook scripts")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("install does not take arguments")
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	hooksDir := filepath.Join(home, ".claude", "hooks")
+	if err := os.MkdirAll(hooksDir, 0o700); err != nil {
+		return err
+	}
+
+	scripts := map[string]string{
+		"on-project-start.sh":      claudeHookScript,
+		"on-user-prompt-submit.sh": claudeHookScript,
+	}
+
+	installed := make([]string, 0, len(scripts))
+	for name, content := range scripts {
+		path := filepath.Join(hooksDir, name)
+		if !force {
+			if existing, err := os.ReadFile(path); err == nil {
+				if string(existing) == content {
+					installed = append(installed, path)
+					continue
+				}
+				return fmt.Errorf("%s already exists (use --force to overwrite)", path)
+			}
+		}
+		if err := writeExecutable(path, content, 0o755); err != nil {
+			return err
+		}
+		installed = append(installed, path)
+	}
+
+	fmt.Printf("Installed Claude Code hooks in %s\n", hooksDir)
+	for _, path := range installed {
+		fmt.Printf(" - %s\n", path)
+	}
+	return nil
+}
+
+const claudeHookScript = "#!/usr/bin/env bash\nset -euo pipefail\n\nif ! command -v tabs-cli >/dev/null 2>&1; then\n  exit 0\nfi\n\nexec tabs-cli capture-event --tool=claude-code\n"
+
+func writeExecutable(path, content string, perm os.FileMode) error {
+	if err := os.WriteFile(path, []byte(content), perm); err != nil {
+		return err
+	}
+	return os.Chmod(path, perm)
 }
 
 func runStatus(args []string) error {

@@ -162,6 +162,25 @@ func (s *Server) handleCapture(conn net.Conn, payload json.RawMessage) {
 		}
 	}
 
+	if req.Tool == "claude-code" {
+		eventsWritten, lastEventTime, err := s.captureClaude(req, sessionID, eventTime)
+		if err != nil {
+			s.writeResponse(conn, errorResponse("storage_error", err.Error()))
+			return
+		}
+		s.mu.Lock()
+		if eventsWritten > 0 {
+			s.state.RecordEvent(sessionID, lastEventTime, eventsWritten)
+		}
+		s.mu.Unlock()
+		data := map[string]interface{}{
+			"session_id":     sessionID,
+			"events_written": eventsWritten,
+		}
+		s.writeResponse(conn, okResponse(data))
+		return
+	}
+
 	normalized, eventJSON, err := normalizeEvent(req.Event, sessionID, req.Tool, eventTime)
 	if err != nil {
 		s.writeResponse(conn, errorResponse("invalid_payload", "Invalid event payload"))

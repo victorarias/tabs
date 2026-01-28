@@ -10,3 +10,6 @@ This file tracks learnings and progress across Ralph iterations.
 - Added tabs-daemon core (PID/lock files, unix socket server, graceful shutdown) with status/capture handlers and CLI auto-start/retry logic.
 - Sandbox note: ~/.tabs is not writable here; run manual tests with `HOME=/tmp/tabs-home` to let daemon/CLI create pid/socket/log files.
 - Implemented JSONL storage with daily session folders, per-session cursor state (hash/offset), and metadata extraction stored alongside cursor state.
+- Added `tabs-cli install` to drop Claude Code hook scripts into `~/.claude/hooks/` and relaxed capture to infer `session_id` from hook payloads.
+- Daemon now reads Claude Code transcript JSONL from `transcript_path`, converts messages/tool events into tabs events, and uses cursor offset/hash to avoid duplicates.
+- Manual Claude Code hook testing not run here (no Claude environment); rely on build/vet/test checks.

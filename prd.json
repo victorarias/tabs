@@ -43,7 +43,7 @@
       "title": "Claude Code hook integration",
       "description": "Implement hook script that calls tabs-cli to capture events from Claude Code transcript.",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Hook script installs to ~/.claude/hooks/",
         "Events captured from transcript on project:start and user:prompt-submit",
