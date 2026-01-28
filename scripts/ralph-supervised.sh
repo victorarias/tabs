@@ -87,11 +87,10 @@ for iteration in $(seq 1 "$MAX_ITERATIONS"); do
     # Call Claude Code to supervise this iteration
     log_info "Calling Claude Code to supervise Codex..."
 
-    if ! claude \
-        --skip-git-repo-check \
-        --full-auto \
-        -C "$PROJECT_DIR" \
-        "$(cat "$CLAUDE_PROMPT")"; then
+    if ! (cd "$PROJECT_DIR" && claude \
+        --print \
+        --permission-mode bypassPermissions \
+        "$(cat "$CLAUDE_PROMPT")"); then
         log_error "Claude Code supervision failed"
         log_warn "Check the output above for errors"
         log_warn "You may need to manually fix issues and resume Ralph"
