@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -11,11 +12,16 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	cfgpkg "github.com/victorarias/tabs/internal/config"
+	"github.com/victorarias/tabs/internal/daemon"
+	"github.com/victorarias/tabs/internal/localserver"
 )
 
 var (
@@ -43,6 +49,8 @@ func main() {
 		err = runInstall(args)
 	case "status":
 		err = runStatus(args)
+	case "ui":
+		err = runUI(args)
 	case "config":
 		err = runConfig(args)
 	case "version", "--version", "-version", "-v":
@@ -68,11 +76,13 @@ func printUsage() {
 	fmt.Println("  tabs-cli capture --session-id <id> --event <json> [--tool claude-code]")
 	fmt.Println("  tabs-cli install")
 	fmt.Println("  tabs-cli status")
+	fmt.Println("  tabs-cli ui")
 	fmt.Println("  tabs-cli config --set key=value")
 	fmt.Println("\nCommands:")
 	fmt.Println("  capture        Send hook event to daemon")
 	fmt.Println("  install        Install Claude Code hook scripts")
 	fmt.Println("  status         Show daemon status")
+	fmt.Println("  ui             Run local web UI API server")
 	fmt.Println("  config         Manage configuration")
 	fmt.Println("  version        Print version info")
 }
@@ -288,6 +298,43 @@ func runStatus(args []string) error {
 		fmt.Printf("Last event: %s\n", data.LastEventAt)
 	}
 	return nil
+}
+
+func runUI(args []string) error {
+	fs := flag.NewFlagSet("ui", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("ui does not take arguments")
+	}
+
+	cfgPath, err := cfgpkg.Path()
+	if err != nil {
+		return err
+	}
+	cfg, err := cfgpkg.Load(cfgPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			cfg = cfgpkg.Default()
+		} else {
+			return err
+		}
+	}
+
+	baseDir, err := daemon.EnsureBaseDir()
+	if err != nil {
+		return err
+	}
+
+	server := localserver.NewServer(baseDir, cfg)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+
+	fmt.Printf("Local API running at http://127.0.0.1:%d\n", cfg.Local.UIPort)
+	return server.ListenAndServe(ctx)
 }
 
 type setFlags []string

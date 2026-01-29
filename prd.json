@@ -55,7 +55,7 @@
       "title": "Implement local web server",
       "description": "Build HTTP server that reads JSONL files and serves JSON API with CSRF protection.",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Server binds to 127.0.0.1 only",
         "Origin/Host checks prevent CSRF",

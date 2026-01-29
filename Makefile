@@ -1,6 +1,6 @@
 # Makefile for tabs
 
-.PHONY: all build build-cli build-daemon build-server test install clean
+.PHONY: all build build-cli build-daemon build-server build-local test install clean
 
 # Version
 VERSION ?= 0.1.0-dev
@@ -16,7 +16,7 @@ BUILD_DIR := build
 
 all: build
 
-build: build-cli build-daemon build-server
+build: build-cli build-daemon build-server build-local
 
 build-cli:
 	@echo "Building tabs-cli..."
@@ -32,6 +32,11 @@ build-server:
 	@echo "Building tabs-server..."
 	@mkdir -p $(BIN_DIR)
 	go build $(LDFLAGS) -o $(BIN_DIR)/tabs-server ./cmd/tabs-server
+
+build-local:
+	@echo "Building tabs-local..."
+	@mkdir -p $(BIN_DIR)
+	go build $(LDFLAGS) -o $(BIN_DIR)/tabs-local ./cmd/tabs-local
 
 test:
 	@echo "Running tests..."

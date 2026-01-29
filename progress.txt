@@ -13,3 +13,8 @@ This file tracks learnings and progress across Ralph iterations.
 - Added `tabs-cli install` to drop Claude Code hook scripts into `~/.claude/hooks/` and relaxed capture to infer `session_id` from hook payloads.
 - Daemon now reads Claude Code transcript JSONL from `transcript_path`, converts messages/tool events into tabs events, and uses cursor offset/hash to avoid duplicates.
 - Manual Claude Code hook testing not run here (no Claude environment); rely on build/vet/test checks.
+
+## 2026-01-29
+- Added local web API server (tabs-local + tabs-cli ui) with localhost-only bind and CSRF Origin/Host checks.
+- Implemented JSONL session scanning for /api/sessions and /api/sessions/:id with metadata extraction and search filtering.
+- Introduced internal/config package for shared config parsing/writing.
