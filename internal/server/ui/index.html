@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tabs - shared</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="logo" role="link" tabindex="0" data-nav="/" aria-label="tabs home">
+          <span class="logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 1C8 4 5.5 7.5 5.5 12c0 5 3.5 9 6.5 11 3-2 6.5-6 6.5-11 0-4.5-2.5-8-6.5-11Z" />
+              <path d="M8.2 9.6c1.2-1.4 2.6-2.6 3.8-3.4" stroke="currentColor" stroke-width="1.2" fill="none" opacity="0.6" />
+            </svg>
+          </span>
+          <span class="logo-text">tabs</span>
+          <span class="logo-sub">shared</span>
+        </div>
+        <div class="search-wrap" role="search">
+          <span class="search-icon" aria-hidden="true">Search</span>
+          <input
+            id="search-input"
+            class="search-input"
+            type="search"
+            placeholder="Search across all shared sessions..."
+            aria-label="Search shared sessions"
+            autocomplete="off"
+          />
+          <button class="clear-btn" id="clear-search" type="button" aria-label="Clear search">Clear</button>
+        </div>
+        <div class="header-actions">
+          <a class="nav-link" href="/" data-nav>Sessions</a>
+          <a class="nav-link" href="/keys" data-nav>Keys</a>
+          <div class="user-pill" id="user-pill">All Teams</div>
+          <button class="ghost-btn" id="theme-toggle" type="button" aria-label="Toggle theme">Theme</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <div class="filters">
+          <label class="filter-label">
+            Tool
+            <select id="tool-filter" class="filter-select" aria-label="Filter by tool">
+              <option value="">All</option>
+            </select>
+          </label>
+          <div class="filter-label tag-filter">
+            <span>Popular tags</span>
+            <div id="tag-cloud" class="tag-cloud" aria-label="Tag filter"></div>
+          </div>
+        </div>
+        <div class="session-count" id="session-count">0 sessions</div>
+      </section>
+
+      <div class="active-tags" id="active-tags"></div>
+
+      <main id="app" class="main" aria-live="polite"></main>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

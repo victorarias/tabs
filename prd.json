@@ -91,7 +91,7 @@
       "title": "Implement remote UI with tagging",
       "description": "Build remote UI that displays all uploaded sessions with tag filtering and search.",
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "UI shows all sessions from all users",
         "Tag-based filtering works",

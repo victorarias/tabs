@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -57,8 +58,12 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/sessions", s.handleUploadSession)
+	mux.HandleFunc("/api/sessions", s.handleSessions)
+	mux.HandleFunc("/api/sessions/", s.handleSessionDetail)
+	mux.HandleFunc("/api/tags", s.handleTags)
 	mux.HandleFunc("/healthz", s.handleHealth)
+	mux.HandleFunc("/app.js", s.handleStatic)
+	mux.HandleFunc("/styles.css", s.handleStatic)
 	mux.HandleFunc("/", s.handleRoot)
 	return mux
 }
@@ -68,9 +73,11 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("tabs-server is running"))
+	if r.URL.Path != "/" && !strings.HasPrefix(r.URL.Path, "/sessions/") && r.URL.Path != "/search" && r.URL.Path != "/keys" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	s.serveUI(w, r, "index.html")
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

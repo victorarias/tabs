@@ -26,3 +26,12 @@ This file tracks learnings and progress across Ralph iterations.
 - Added migrations in /migrations and a tabs-server migrate command; optional MIGRATE_ON_START env runs migrations at boot.
 - Pinned pgx to v5.7.4 to keep go 1.23 compatibility; go commands require GOCACHE/GOMODCACHE/GOPATH in /tmp and GOSUMDB=off in this sandbox.
 - Manual smoke test: docker compose up -d, run tabs-server migrate, insert api_keys row, POST /api/sessions, verify rows, then docker compose down.
+
+## 2026-01-29 (phase3-remote-ui)
+- Implemented remote UI for tabs-server with embedded HTML/CSS/JS in internal/server/ui/.
+- Added API endpoints: GET /api/sessions (list with filters), GET /api/sessions/:id (detail), GET /api/tags (tag cloud).
+- Remote UI features: emerald accent color (#059669), tag cloud with counts, tag-based filtering with active tag pills, uploaded_by display on session cards.
+- Codex created the structure but missed styles.css and app.js files; manually created them based on local UI patterns with remote-specific modifications.
+- Fixed unused import error in remote_handlers.go (removed "errors" import).
+- Playwright testing verified: timeline shows sessions from all users grouped by day, tag filtering works (clicking tag filters to matching sessions), search spans all sessions.
+- Design follows spec: DM Serif Display + IBM Plex Sans typography, warm backgrounds, emerald accents for "shared" context differentiation from local amber UI.
