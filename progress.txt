@@ -20,3 +20,9 @@ This file tracks learnings and progress across Ralph iterations.
 - Introduced internal/config package for shared config parsing/writing.
 - Implemented embedded local UI (HTML/CSS/JS) in tabs-local for timeline, session detail, and settings views with musical styling and animations.
 - Added session summary extraction from first user message plus recursive search matching across event data (tool names, file paths, cwd, content).
+
+## 2026-01-29
+- Implemented tabs-server with POST /api/sessions, API key auth (SHA256 hash match), normalization into sessions/messages/tools/tags, and uploaded_by from api_keys.user_id.
+- Added migrations in /migrations and a tabs-server migrate command; optional MIGRATE_ON_START env runs migrations at boot.
+- Pinned pgx to v5.7.4 to keep go 1.23 compatibility; go commands require GOCACHE/GOMODCACHE/GOPATH in /tmp and GOSUMDB=off in this sandbox.
+- Manual smoke test: docker compose up -d, run tabs-server migrate, insert api_keys row, POST /api/sessions, verify rows, then docker compose down.

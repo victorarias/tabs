@@ -79,7 +79,7 @@
       "title": "Implement remote server with PostgreSQL",
       "description": "Build tabs-server that accepts uploads via API key auth and stores in PostgreSQL.",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Server accepts POST /api/sessions with API key",
         "Sessions stored in PostgreSQL with normalization",
