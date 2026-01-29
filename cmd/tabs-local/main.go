@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +10,7 @@ import (
 	"github.com/victorarias/tabs/internal/config"
 	"github.com/victorarias/tabs/internal/daemon"
 	"github.com/victorarias/tabs/internal/localserver"
+	"github.com/victorarias/tabs/internal/logging"
 )
 
 var (
@@ -20,14 +20,17 @@ var (
 )
 
 func main() {
+	fallback := logging.New("info", os.Stderr).With("component", "local")
 	baseDir, err := daemon.EnsureBaseDir()
 	if err != nil {
-		log.Fatalf("local server init failed: %v", err)
+		fallback.Error("local server init failed", "error", err)
+		os.Exit(1)
 	}
 
 	cfgPath, err := config.Path()
 	if err != nil {
-		log.Fatalf("config path failed: %v", err)
+		fallback.Error("config path failed", "error", err)
+		os.Exit(1)
 	}
 
 	cfg, err := config.Load(cfgPath)
@@ -35,18 +38,21 @@ func main() {
 		if os.IsNotExist(err) {
 			cfg = config.Default()
 		} else {
-			log.Fatalf("load config failed: %v", err)
+			fallback.Error("load config failed", "error", err)
+			os.Exit(1)
 		}
 	}
+	logger := logging.New(cfg.Local.LogLevel, os.Stdout).With("component", "local")
 
 	server := localserver.NewServer(baseDir, cfg)
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	fmt.Printf("tabs-local %s (commit: %s, built: %s)\n", Version, Commit, BuildTime)
+	logger.Info("starting", "version", Version, "commit", Commit, "built", BuildTime)
 	fmt.Printf("Local API running at http://127.0.0.1:%d\n", cfg.Local.UIPort)
 
 	if err := server.ListenAndServe(ctx); err != nil {
-		log.Fatalf("local server stopped: %v", err)
+		logger.Error("local server stopped", "error", err)
+		os.Exit(1)
 	}
 }

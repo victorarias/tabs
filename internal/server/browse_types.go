@@ -10,11 +10,23 @@ type SessionFilter struct {
 	UploadedBy string
 	Tags       []Tag
 	Query      string
+	Page       int
+	Limit      int
+	Sort       string
+	Order      string
 }
 
 type SessionsResponse struct {
-	Sessions []SessionSummary `json:"sessions"`
-	Total    int              `json:"total"`
+	Sessions   []SessionSummary `json:"sessions"`
+	Total      int              `json:"total"`
+	Pagination *Pagination      `json:"pagination,omitempty"`
+}
+
+type Pagination struct {
+	Page       int `json:"page"`
+	Limit      int `json:"limit"`
+	Total      int `json:"total"`
+	TotalPages int `json:"total_pages"`
 }
 
 type SessionSummary struct {

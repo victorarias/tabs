@@ -60,6 +60,7 @@ func cleanupStalePID(pidPath, lockPath string) error {
 	data, err := os.ReadFile(pidPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			_ = os.Remove(lockPath)
 			return nil
 		}
 		return fmt.Errorf("read pid file: %w", err)

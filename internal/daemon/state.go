@@ -15,6 +15,7 @@ type State struct {
 	eventsProcessed int
 	lastEventAt     time.Time
 	sessionFiles    map[string]string
+	cursorPolling   bool
 }
 
 func NewState() *State {
@@ -51,12 +52,16 @@ func (s *State) Snapshot(pid int) Status {
 		UptimeSeconds:    int(time.Since(s.start).Seconds()),
 		SessionsCaptured: len(s.sessions),
 		EventsProcessed:  s.eventsProcessed,
-		CursorPolling:    false,
+		CursorPolling:    s.cursorPolling,
 	}
 	if !s.lastEventAt.IsZero() {
 		status.LastEventAt = s.lastEventAt.UTC().Format(time.RFC3339Nano)
 	}
 	return status
+}
+
+func (s *State) SetCursorPolling(enabled bool) {
+	s.cursorPolling = enabled
 }
 
 func (s *State) EnsureSessionFile(baseDir, sessionID, tool string, eventTime time.Time) (string, error) {

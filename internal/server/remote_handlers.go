@@ -20,11 +20,21 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.requireJSONAuth(w, r); !ok {
+		return
+	}
 	filter := SessionFilter{
 		Tool:       strings.TrimSpace(r.URL.Query().Get("tool")),
 		UploadedBy: strings.TrimSpace(r.URL.Query().Get("uploaded_by")),
 		Query:      strings.TrimSpace(r.URL.Query().Get("q")),
 	}
+	filter.Page = parsePositiveInt(r.URL.Query().Get("page"), 1)
+	filter.Limit = parsePositiveInt(r.URL.Query().Get("limit"), 20)
+	if filter.Limit > 100 {
+		filter.Limit = 100
+	}
+	filter.Sort = strings.TrimSpace(r.URL.Query().Get("sort"))
+	filter.Order = strings.TrimSpace(r.URL.Query().Get("order"))
 
 	for _, rawTag := range r.URL.Query()["tag"] {
 		tag, err := normalizeTagFilter(rawTag)
@@ -34,7 +44,7 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 		filter.Tags = append(filter.Tags, tag)
 	}
 
-	sessions, err := s.listSessions(r.Context(), filter)
+	sessions, total, err := s.listSessions(r.Context(), filter)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, "server_error", "Failed to load sessions")
 		return
@@ -42,14 +52,49 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 
 	resp := SessionsResponse{
 		Sessions: sessions,
-		Total:    len(sessions),
+		Total:    total,
+		Pagination: &Pagination{
+			Page:       filter.Page,
+			Limit:      filter.Limit,
+			Total:      total,
+			TotalPages: calcTotalPages(total, filter.Limit),
+		},
 	}
 	s.writeJSON(w, http.StatusOK, resp)
+}
+
+func parsePositiveInt(raw string, fallback int) int {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(raw)
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
+}
+
+func calcTotalPages(total, limit int) int {
+	if limit <= 0 {
+		return 1
+	}
+	pages := total / limit
+	if total%limit != 0 {
+		pages++
+	}
+	if pages == 0 {
+		pages = 1
+	}
+	return pages
 }
 
 func (s *Server) handleSessionDetail(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if _, ok := s.requireJSONAuth(w, r); !ok {
 		return
 	}
 
@@ -83,6 +128,9 @@ func (s *Server) handleSessionDetail(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if _, ok := s.requireJSONAuth(w, r); !ok {
 		return
 	}
 

@@ -347,6 +347,17 @@ a:hover {
   50% { opacity: 1; }
 }
 
+@keyframes floatIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .empty-state {
   background: var(--bg-secondary);
   border: 1px dashed var(--border);
@@ -366,6 +377,12 @@ a:hover {
   flex-direction: column;
   gap: var(--space-2);
   margin-bottom: var(--space-6);
+}
+
+.session-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: var(--space-2) 0;
 }
 
 .session-id {
@@ -435,6 +452,62 @@ a:hover {
 .tool-card.error {
   border-color: rgba(220, 38, 38, 0.4);
   background: rgba(220, 38, 38, 0.08);
+}
+
+.primary-btn {
+  border: none;
+  border-radius: 999px;
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 200ms ease, background 200ms ease;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 22, 20, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  z-index: 40;
+}
+
+.modal {
+  width: min(520px, 100%);
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: var(--space-6);
+  box-shadow: var(--shadow-lg);
+  animation: floatIn 200ms ease;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.modal-subtext {
+  margin: 0 0 var(--space-4);
+  color: var(--fg-secondary);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
 }
 
 .back-link {

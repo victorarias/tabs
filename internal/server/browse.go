@@ -9,8 +9,26 @@ import (
 	"strings"
 )
 
-func (s *Server) listSessions(ctx context.Context, filter SessionFilter) ([]SessionSummary, error) {
+func (s *Server) listSessions(ctx context.Context, filter SessionFilter) ([]SessionSummary, int, error) {
 	whereClause, args := buildSessionWhere(filter)
+
+	orderField := "s.created_at"
+	if strings.TrimSpace(filter.Sort) == "uploaded_at" {
+		orderField = "s.uploaded_at"
+	}
+	orderDir := "DESC"
+	if strings.EqualFold(filter.Order, "asc") {
+		orderDir = "ASC"
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
 
 	query := `
 		SELECT
@@ -33,12 +51,14 @@ func (s *Server) listSessions(ctx context.Context, filter SessionFilter) ([]Sess
 		) first_msg ON true
 		` + whereClause + `
 		GROUP BY s.id, first_msg.content
-		ORDER BY s.created_at DESC
+		ORDER BY ` + orderField + ` ` + orderDir + `
+		LIMIT $` + fmt.Sprintf("%d", len(args)+1) + ` OFFSET $` + fmt.Sprintf("%d", len(args)+2) + `
 	`
+	args = append(args, limit, offset)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -62,7 +82,7 @@ func (s *Server) listSessions(ctx context.Context, filter SessionFilter) ([]Sess
 			&contentRaw,
 			&tagsRaw,
 		); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		if len(tagsRaw) > 0 {
 			_ = json.Unmarshal(tagsRaw, &summary.Tags)
@@ -71,9 +91,23 @@ func (s *Server) listSessions(ctx context.Context, filter SessionFilter) ([]Sess
 		sessions = append(sessions, summary)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return sessions, nil
+
+	total, err := s.countSessions(ctx, whereClause, args[:len(args)-2])
+	if err != nil {
+		return nil, 0, err
+	}
+	return sessions, total, nil
+}
+
+func (s *Server) countSessions(ctx context.Context, whereClause string, args []interface{}) (int, error) {
+	query := `SELECT COUNT(*) FROM sessions s ` + whereClause
+	var total int
+	if err := s.db.QueryRowContext(ctx, query, args...).Scan(&total); err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (s *Server) getSession(ctx context.Context, id string) (SessionDetail, error) {

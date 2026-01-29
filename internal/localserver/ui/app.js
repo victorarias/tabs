@@ -20,6 +20,7 @@
   const sessionCount = document.getElementById('session-count');
   const themeToggle = document.getElementById('theme-toggle');
   const toast = document.getElementById('toast');
+  let cachedConfig = null;
 
   const placeholders = [
     'Search sessions, messages, files...',
@@ -305,6 +306,9 @@
     header.innerHTML = `
       <a class="back-link" href="/" data-nav>&larr; Back</a>
       <div class="session-id">Session: ${escapeHTML(detail.session_id)}</div>
+      <div class="session-actions">
+        <button class="primary-btn" id="share-session" type="button">Share</button>
+      </div>
       <div class="session-meta-line">${escapeHTML(detail.tool || 'unknown')} - ${escapeHTML(formatDate(detail.created_at))} ${escapeHTML(formatTime(detail.created_at))} - ${escapeHTML(formatDuration(detail.duration_seconds))}</div>
       <div class="session-meta-line">${escapeHTML(detail.cwd || '')}</div>
       <div class="session-meta-line">${messageCount} messages - ${toolCount} tools</div>
@@ -351,6 +355,119 @@
     app.innerHTML = '';
     app.appendChild(header);
     app.appendChild(list);
+
+    const shareBtn = document.getElementById('share-session');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', () => openShareModal(detail));
+    }
+  };
+
+  const parseTagInput = (value) => {
+    const tags = [];
+    const tokens = value
+      .split(/[,\\n]/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    tokens.forEach((token) => {
+      const split = token.includes(':') ? token.split(':') : token.split('=');
+      if (split.length < 2) return;
+      const key = split[0].trim();
+      const rest = split.slice(1).join(':').trim();
+      if (!key || !rest) return;
+      tags.push({ key, value: rest });
+    });
+    return tags;
+  };
+
+  const openShareModal = (detail) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-header">
+          <h3>Share Session</h3>
+          <button class="ghost-btn" type="button" id="share-close">Close</button>
+        </div>
+        <p class="modal-subtext">Add tags like <strong>team:platform</strong> or <strong>repo:myapp</strong>.</p>
+        <label class="filter-label">Tags (optional)
+          <input id="share-tags" class="search-input" type="text" placeholder="team:platform, repo:myapp" />
+        </label>
+        <div class="session-stats" id="share-status"></div>
+        <div class="modal-actions">
+          <button class="ghost-btn" type="button" id="share-cancel">Cancel</button>
+          <button class="primary-btn" type="button" id="share-submit">Share →</button>
+        </div>
+      </div>
+    `;
+
+    const close = () => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKeydown);
+    };
+    const onKeydown = (event) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKeydown);
+
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close();
+    });
+
+    const closeBtn = overlay.querySelector('#share-close');
+    const cancelBtn = overlay.querySelector('#share-cancel');
+    const submitBtn = overlay.querySelector('#share-submit');
+    const tagsInput = overlay.querySelector('#share-tags');
+    const statusEl = overlay.querySelector('#share-status');
+
+    const ensureDefaults = async () => {
+      if (!cachedConfig) {
+        const resp = await fetch('/api/config');
+        if (resp.ok) {
+          cachedConfig = await resp.json();
+        }
+      }
+      const defaults =
+        cachedConfig &&
+        cachedConfig.remote &&
+        Array.isArray(cachedConfig.remote.default_tags)
+          ? cachedConfig.remote.default_tags
+          : [];
+      if (tagsInput && defaults.length && !tagsInput.value.trim()) {
+        tagsInput.value = defaults.join(', ');
+      }
+    };
+
+    const share = async () => {
+      statusEl.textContent = 'Uploading...';
+      const tags = parseTagInput(tagsInput.value || '');
+      const payload = {
+        session_id: detail.session_id,
+        tool: detail.tool,
+        tags,
+      };
+      const resp = await fetch('/api/sessions/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        const data = await resp.json().catch(() => null);
+        statusEl.textContent = data && data.url ? `Shared: ${data.url}` : 'Shared.';
+        showToast('Session shared');
+        setTimeout(close, 1200);
+      } else {
+        const data = await resp.json().catch(() => null);
+        statusEl.textContent = data && data.error ? data.error.message : 'Failed to share.';
+      }
+    };
+
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    if (cancelBtn) cancelBtn.addEventListener('click', close);
+    if (submitBtn) submitBtn.addEventListener('click', share);
+
+    document.body.appendChild(overlay);
+    ensureDefaults().catch(() => {});
+    if (tagsInput) tagsInput.focus();
   };
 
   const loadSessionDetail = async (id) => {

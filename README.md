@@ -173,6 +173,27 @@ docker run -d \
   yourorg/tabs-server:latest
 ```
 
+### Authentication Configuration
+
+`tabs-server` supports configurable auth for JSON APIs (sessions browse, tags, keys). Defaults to **off** for local/dev.
+
+```bash
+# Disable auth (default)
+AUTH_MODE=off
+
+# Trust a header (dev/proxy mode)
+AUTH_MODE=header
+AUTH_HEADER_USER=X-Forwarded-User
+
+# Google IAP JWT verification
+AUTH_MODE=iap-google
+IAP_AUDIENCE=<your-iap-client-id>
+IAP_ISSUER=https://cloud.google.com/iap
+IAP_JWKS_URL=https://www.gstatic.com/iap/verify/public_key-jwk
+```
+
+`POST /api/sessions` remains API key–based regardless of mode.
+
 ### Infrastructure
 
 The remote server should be deployed behind an Identity-Aware Proxy (IAP):

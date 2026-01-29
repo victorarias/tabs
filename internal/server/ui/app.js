@@ -453,18 +453,118 @@
 
   const loadKeys = async () => {
     state.view = 'keys';
+    setLoading('Loading API keys...');
+    try {
+      const resp = await fetch('/api/keys');
+      if (!resp.ok) throw new Error('Failed to load keys');
+      const data = await resp.json();
+      renderKeys(data.keys || []);
+    } catch (err) {
+      app.innerHTML = `
+        <section class="session-header">
+          <h2>API Keys</h2>
+          <p>Create keys to upload sessions from your local machine.</p>
+          <p class="session-meta-line">Note: API key management requires authentication via IAP.</p>
+        </section>
+        <div class="empty-state">
+          <div class="icon">Key</div>
+          <p>API keys unavailable.</p>
+          <p>Ensure IAP headers are present and try again.</p>
+        </div>
+      `;
+    }
+  };
+
+  const renderKeys = (keys) => {
     app.innerHTML = `
-      <section class="session-header">
+      <section class="session-header keys-page">
         <h2>API Keys</h2>
         <p>Create keys to upload sessions from your local machine.</p>
-        <p class="session-meta-line">Note: API key management requires authentication via IAP.</p>
       </section>
-      <div class="empty-state">
-        <div class="icon">Key</div>
-        <p>API key management coming soon.</p>
-        <p>For now, contact your admin to create an API key.</p>
-      </div>
+      <section class="message-card keys-card">
+        <div class="role">Create new key</div>
+        <label class="filter-label">Name
+          <input id="key-name" class="search-input" type="text" placeholder="My laptop" />
+        </label>
+        <button class="ghost-btn" id="create-key" type="button">Create Key</button>
+        <div class="session-stats" id="key-create-status"></div>
+        <div class="session-stats" id="key-created-value"></div>
+      </section>
+      <section class="message-card keys-card">
+        <div class="role">Existing keys</div>
+        <div id="keys-list"></div>
+      </section>
     `;
+
+    const list = document.getElementById('keys-list');
+    if (keys.length === 0 && list) {
+      list.innerHTML = '<p class="session-meta-line">No keys yet.</p>';
+    } else if (list) {
+      list.innerHTML = keys
+        .map(
+          (key) => `
+            <div class="key-row">
+              <div>
+                <div class="key-name">${escapeHTML(key.name || 'Key')}</div>
+                <div class="session-meta-line">${escapeHTML(key.key_prefix)}</div>
+              </div>
+              <div class="key-meta">
+                <div class="session-meta-line">${key.is_active ? 'Active' : 'Revoked'}</div>
+                <button class="ghost-btn" data-revoke="${escapeHTML(key.id)}" ${key.is_active ? '' : 'disabled'}>Revoke</button>
+              </div>
+            </div>
+          `,
+        )
+        .join('');
+    }
+
+    const createBtn = document.getElementById('create-key');
+    const nameInput = document.getElementById('key-name');
+    const statusEl = document.getElementById('key-create-status');
+    const valueEl = document.getElementById('key-created-value');
+
+    if (createBtn) {
+      createBtn.addEventListener('click', async () => {
+        const name = nameInput.value.trim();
+        if (!name) {
+          statusEl.textContent = 'Name is required.';
+          return;
+        }
+        statusEl.textContent = 'Creating...';
+        valueEl.textContent = '';
+        const resp = await fetch('/api/keys', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        });
+        if (resp.ok) {
+          const data = await resp.json().catch(() => null);
+          statusEl.textContent = 'Key created. Copy it now — it will only be shown once.';
+          if (data && data.key) {
+            valueEl.textContent = data.key;
+          }
+          nameInput.value = '';
+          loadKeys();
+        } else {
+          const data = await resp.json().catch(() => null);
+          statusEl.textContent = data && data.error ? data.error.message : 'Failed to create key.';
+        }
+      });
+    }
+
+    app.querySelectorAll('[data-revoke]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const id = button.getAttribute('data-revoke');
+        if (!id) return;
+        const resp = await fetch(`/api/keys/${id}`, { method: 'DELETE' });
+        if (resp.ok) {
+          showToast('Key revoked');
+          loadKeys();
+        } else {
+          showToast('Failed to revoke key');
+        }
+      });
+    });
   };
 
   const route = () => {

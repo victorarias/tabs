@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/victorarias/tabs/internal/config"
 	"github.com/victorarias/tabs/internal/daemon"
+	"github.com/victorarias/tabs/internal/logging"
 )
 
 var (
@@ -18,33 +19,51 @@ var (
 )
 
 func main() {
+	fallback := logging.New("info", os.Stderr).With("component", "daemon")
 	baseDir, err := daemon.EnsureBaseDir()
 	if err != nil {
-		log.Fatalf("daemon init failed: %v", err)
+		fallback.Error("daemon init failed", "error", err)
+		os.Exit(1)
+	}
+
+	cfg := config.Default()
+	if cfgPath, err := config.Path(); err != nil {
+		fallback.Warn("config path error", "error", err)
+	} else if loaded, err := config.Load(cfgPath); err != nil {
+		if !os.IsNotExist(err) {
+			fallback.Warn("config load error", "error", err)
+		}
+	} else {
+		cfg = loaded
 	}
 
 	logFile, err := os.OpenFile(daemon.LogPath(baseDir), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		log.Fatalf("open log file: %v", err)
+		fallback.Error("open log file failed", "error", err)
+		os.Exit(1)
 	}
 	defer logFile.Close()
 
-	logger := log.New(logFile, "", log.LstdFlags|log.LUTC)
-	logger.Printf("tabs-daemon %s (commit: %s, built: %s) starting", Version, Commit, BuildTime)
+	logger := logging.New(cfg.Local.LogLevel, logFile).With("component", "daemon")
+	logger.Info("starting", "version", Version, "commit", Commit, "built", BuildTime)
 
 	pidLock, err := daemon.AcquirePID(baseDir)
 	if err != nil {
-		logger.Fatalf("pid lock failed: %v", err)
+		logger.Error("pid lock failed", "error", err)
+		os.Exit(1)
 	}
 
 	server := daemon.NewServer(baseDir, logger)
 	if err := server.Listen(); err != nil {
 		_ = pidLock.Release()
-		logger.Fatalf("socket listen failed: %v", err)
+		logger.Error("socket listen failed", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+
+	daemon.StartCursorPoller(ctx, server, cfg)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -55,18 +74,18 @@ func main() {
 	case <-ctx.Done():
 	case err := <-errCh:
 		if err != nil {
-			logger.Printf("server error: %v", err)
+			logger.Error("server error", "error", err)
 		}
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Printf("shutdown error: %v", err)
+		logger.Error("shutdown error", "error", err)
 	}
 
 	if err := pidLock.Release(); err != nil {
-		logger.Printf("cleanup error: %v", err)
+		logger.Error("cleanup error", "error", err)
 	}
-	logger.Printf("tabs-daemon stopped")
+	logger.Info("stopped")
 }

@@ -4,28 +4,35 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/victorarias/tabs/internal/logging"
 )
 
 type Server struct {
 	db      *sql.DB
 	baseURL string
-	logger  *log.Logger
+	logger  *slog.Logger
+	auth    Authenticator
 }
 
-func NewServer(db *sql.DB, baseURL string, logger *log.Logger) *Server {
+func NewServer(db *sql.DB, baseURL string, logger *slog.Logger, auth Authenticator) *Server {
 	if logger == nil {
-		logger = log.New(log.Writer(), "", log.LstdFlags|log.LUTC)
+		logger = logging.New("info", nil)
+	}
+	if auth == nil {
+		auth = NoAuth{}
 	}
 	return &Server{
 		db:      db,
 		baseURL: baseURL,
 		logger:  logger,
+		auth:    auth,
 	}
 }
 
@@ -61,11 +68,40 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("/api/sessions", s.handleSessions)
 	mux.HandleFunc("/api/sessions/", s.handleSessionDetail)
 	mux.HandleFunc("/api/tags", s.handleTags)
+	mux.HandleFunc("/api/keys", s.handleKeys)
+	mux.HandleFunc("/api/keys/", s.handleKeyDetail)
 	mux.HandleFunc("/healthz", s.handleHealth)
 	mux.HandleFunc("/app.js", s.handleStatic)
 	mux.HandleFunc("/styles.css", s.handleStatic)
 	mux.HandleFunc("/", s.handleRoot)
-	return mux
+	return s.logRequests(mux)
+}
+
+func (s *Server) logRequests(next http.Handler) http.Handler {
+	if s.logger == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		s.logger.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rec.status,
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
 }
 
 func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +139,18 @@ func (s *Server) writeJSON(w http.ResponseWriter, status int, payload interface{
 func (s *Server) writeError(w http.ResponseWriter, status int, code, message string) {
 	resp := ErrorResponse{Error: ErrorPayload{Code: code, Message: message}}
 	s.writeJSON(w, status, resp)
+}
+
+func (s *Server) requireJSONAuth(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if s.auth == nil {
+		return "", true
+	}
+	user, err := s.auth.Authenticate(r)
+	if err != nil {
+		s.writeError(w, http.StatusForbidden, "forbidden", err.Error())
+		return "", false
+	}
+	return user, true
 }
 
 func parsePort(value string, fallback int) int {

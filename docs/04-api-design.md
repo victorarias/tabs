@@ -524,6 +524,21 @@ Only allow `http://localhost:<port>` and `http://127.0.0.1:<port>`. Reject all o
   - IAP (Identity-Aware Proxy) for web UI routes
   - API key (Bearer token) for `/api/sessions` POST
 
+### Configurable Auth Modes (Server)
+
+`tabs-server` supports configurable authentication for JSON APIs. The default is **off** for local/dev environments.
+
+**Environment Variables:**
+- `AUTH_MODE=off|header|iap-google` (default: `off`)
+- `AUTH_HEADER_USER` (header mode only, default: `X-Forwarded-User`)
+- `IAP_AUDIENCE` (iap-google only, required) — expected JWT audience
+- `IAP_ISSUER` (iap-google only, optional; default `https://cloud.google.com/iap`)
+- `IAP_JWKS_URL` (iap-google only, optional; default Google IAP JWKS endpoint)
+
+**Protection scope (JSON APIs only):**
+- `GET /api/sessions`, `GET /api/sessions/:id`, `GET /api/tags`, and `/api/keys` endpoints require auth when `AUTH_MODE` is not `off`.
+- `POST /api/sessions` uses API key auth only (unchanged).
+
 ---
 
 ### 3.1 Public API (API Key Auth)

@@ -17,7 +17,7 @@ func (s *Server) captureClaude(req capturePayload, sessionID string, hookTime ti
 
 	cursor, err := loadCursorState(s.baseDir, sessionID)
 	if err != nil {
-		s.logger.Printf("cursor state load failed for %s: %v", sessionID, err)
+		s.logger.Warn("cursor state load failed", "session_id", sessionID, "error", err)
 		return 0, time.Time{}, err
 	}
 	if cursor == nil {
@@ -220,7 +220,7 @@ func (s *Server) appendClaudeTranscript(sessionPath, sessionID string, cursor *S
 
 		events, lineTime, parseErr := claudeEventsFromLine(trimmed, sessionID, hookTime)
 		if parseErr != nil {
-			s.logger.Printf("failed to parse transcript line for %s: %v", sessionID, parseErr)
+			s.logger.Warn("failed to parse transcript line", "session_id", sessionID, "error", parseErr)
 			if errors.Is(err, io.EOF) {
 				break
 			}

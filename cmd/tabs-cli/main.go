@@ -22,6 +22,7 @@ import (
 	cfgpkg "github.com/victorarias/tabs/internal/config"
 	"github.com/victorarias/tabs/internal/daemon"
 	"github.com/victorarias/tabs/internal/localserver"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -47,6 +48,8 @@ func main() {
 		err = runCapture(args)
 	case "install":
 		err = runInstall(args)
+	case "push", "push-session":
+		err = runPush(args)
 	case "status":
 		err = runStatus(args)
 	case "ui":
@@ -75,12 +78,14 @@ func printUsage() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  tabs-cli capture --session-id <id> --event <json> [--tool claude-code]")
 	fmt.Println("  tabs-cli install")
+	fmt.Println("  tabs-cli push --session-id <id> --tool <tool> [--tag key:value]")
 	fmt.Println("  tabs-cli status")
 	fmt.Println("  tabs-cli ui")
 	fmt.Println("  tabs-cli config --set key=value")
 	fmt.Println("\nCommands:")
 	fmt.Println("  capture        Send hook event to daemon")
 	fmt.Println("  install        Install Claude Code hook scripts")
+	fmt.Println("  push           Upload a session to remote server")
 	fmt.Println("  status         Show daemon status")
 	fmt.Println("  ui             Run local web UI API server")
 	fmt.Println("  config         Manage configuration")
@@ -109,6 +114,11 @@ type responseError struct {
 	Message string `json:"message"`
 }
 
+type pushTag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 func runCapture(args []string) error {
 	fs := flag.NewFlagSet("capture", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -135,8 +145,13 @@ func runCapture(args []string) error {
 	if sessionID == "" {
 		if existing, ok := eventObj["session_id"].(string); ok && existing != "" {
 			sessionID = existing
-		} else {
-			return errors.New("--session-id is required (or event.session_id)")
+		} else if tool == "cursor" {
+			if existing, ok := eventObj["conversation_id"].(string); ok && existing != "" {
+				sessionID = existing
+			}
+		}
+		if sessionID == "" {
+			return errors.New("--session-id is required (or event.session_id / event.conversation_id)")
 		}
 	}
 
@@ -150,6 +165,11 @@ func runCapture(args []string) error {
 		}
 	} else {
 		eventObj["session_id"] = sessionID
+	}
+	if tool == "cursor" {
+		if existing, ok := eventObj["conversation_id"].(string); ok && existing != "" && existing != sessionID {
+			return fmt.Errorf("event.conversation_id (%s) does not match --session-id", existing)
+		}
 	}
 
 	ts := timestamp
@@ -189,6 +209,82 @@ func runCapture(args []string) error {
 	return nil
 }
 
+type tagFlags []string
+
+func (t *tagFlags) String() string {
+	return strings.Join(*t, ", ")
+}
+
+func (t *tagFlags) Set(value string) error {
+	*t = append(*t, value)
+	return nil
+}
+
+func runPush(args []string) error {
+	fs := flag.NewFlagSet("push", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	var sessionID string
+	var tool string
+	var tags tagFlags
+
+	fs.StringVar(&sessionID, "session-id", "", "Session ID (UUID)")
+	fs.StringVar(&tool, "tool", "claude-code", "Tool name: claude-code or cursor")
+	fs.Var(&tags, "tag", "Tag key:value (repeatable)")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if sessionID == "" {
+		return errors.New("--session-id is required")
+	}
+	if tool != "claude-code" && tool != "cursor" {
+		return errors.New("--tool must be claude-code or cursor")
+	}
+
+	parsedTags, err := parsePushTags(tags)
+	if err != nil {
+		return err
+	}
+
+	resp, err := sendSocketRequest(request{
+		Version: protocolVersion,
+		Type:    "push_session",
+		Payload: map[string]interface{}{
+			"session_id": sessionID,
+			"tool":       tool,
+			"tags":       parsedTags,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if resp.Status != "ok" {
+		return formatResponseError(resp)
+	}
+
+	var data struct {
+		RemoteID string `json:"remote_id"`
+		URL      string `json:"url"`
+	}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		fmt.Println(string(resp.Data))
+		return nil
+	}
+
+	if data.RemoteID != "" {
+		fmt.Printf("Session uploaded: %s\n", data.RemoteID)
+	}
+	if data.URL != "" {
+		fmt.Printf("URL: %s\n", data.URL)
+	}
+	if data.RemoteID == "" && data.URL == "" {
+		fmt.Println("Session uploaded.")
+	}
+	return nil
+}
+
 func runInstall(args []string) error {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
@@ -213,6 +309,9 @@ func runInstall(args []string) error {
 		return err
 	}
 
+	claudeCommand := "tabs-cli capture-event --tool=claude-code"
+	cursorCommand := "tabs-cli capture-event --tool=cursor"
+
 	scripts := map[string]string{
 		"on-project-start.sh":      claudeHookScript,
 		"on-user-prompt-submit.sh": claudeHookScript,
@@ -236,9 +335,24 @@ func runInstall(args []string) error {
 		installed = append(installed, path)
 	}
 
+	claudeConfigPath, err := installClaudeConfig(claudeCommand)
+	if err != nil {
+		return err
+	}
+	cursorConfigPath, err := installCursorHooks(cursorCommand)
+	if err != nil {
+		return err
+	}
+
 	fmt.Printf("Installed Claude Code hooks in %s\n", hooksDir)
 	for _, path := range installed {
 		fmt.Printf(" - %s\n", path)
+	}
+	if claudeConfigPath != "" {
+		fmt.Printf("Updated Claude config: %s\n", claudeConfigPath)
+	}
+	if cursorConfigPath != "" {
+		fmt.Printf("Updated Cursor hooks: %s\n", cursorConfigPath)
 	}
 	return nil
 }
@@ -250,6 +364,110 @@ func writeExecutable(path, content string, perm os.FileMode) error {
 		return err
 	}
 	return os.Chmod(path, perm)
+}
+
+type claudeConfig struct {
+	Hooks map[string][]claudeHook `yaml:"hooks"`
+}
+
+type claudeHook struct {
+	Command string `yaml:"command"`
+}
+
+func installClaudeConfig(command string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	configPath := filepath.Join(home, ".claude", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
+		return "", err
+	}
+
+	cfg := claudeConfig{Hooks: map[string][]claudeHook{}}
+	if data, err := os.ReadFile(configPath); err == nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			return "", fmt.Errorf("parse %s: %w", configPath, err)
+		}
+	}
+	if cfg.Hooks == nil {
+		cfg.Hooks = map[string][]claudeHook{}
+	}
+	events := []string{"SessionStart", "SessionEnd", "ToolUse"}
+	for _, event := range events {
+		cfg.Hooks[event] = ensureClaudeHook(cfg.Hooks[event], command)
+	}
+
+	out, err := yaml.Marshal(cfg)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(configPath, out, 0o600); err != nil {
+		return "", err
+	}
+	return configPath, nil
+}
+
+func ensureClaudeHook(existing []claudeHook, command string) []claudeHook {
+	for _, hook := range existing {
+		if strings.TrimSpace(hook.Command) == command {
+			return existing
+		}
+	}
+	return append(existing, claudeHook{Command: command})
+}
+
+type cursorHooks struct {
+	Version int                     `json:"version"`
+	Hooks   map[string][]cursorHook `json:"hooks"`
+}
+
+type cursorHook struct {
+	Command string `json:"command"`
+}
+
+func installCursorHooks(command string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	configPath := filepath.Join(home, ".cursor", "hooks.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
+		return "", err
+	}
+
+	cfg := cursorHooks{Version: 1, Hooks: map[string][]cursorHook{}}
+	if data, err := os.ReadFile(configPath); err == nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return "", fmt.Errorf("parse %s: %w", configPath, err)
+		}
+	}
+	if cfg.Hooks == nil {
+		cfg.Hooks = map[string][]cursorHook{}
+	}
+	cfg.Version = 1
+	events := []string{"beforeSubmitPrompt", "stop"}
+	for _, event := range events {
+		cfg.Hooks[event] = ensureCursorHook(cfg.Hooks[event], command)
+	}
+
+	out, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(configPath, out, 0o600); err != nil {
+		return "", err
+	}
+	return configPath, nil
+}
+
+func ensureCursorHook(existing []cursorHook, command string) []cursorHook {
+	for _, hook := range existing {
+		if strings.TrimSpace(hook.Command) == command {
+			return existing
+		}
+	}
+	return append(existing, cursorHook{Command: command})
 }
 
 func runStatus(args []string) error {
@@ -380,17 +598,17 @@ func runConfig(args []string) error {
 		return errors.New("config requires --set key=value or 'config set <key> <value>'")
 	}
 
-	cfgPath, err := configFilePath()
+	cfgPath, err := cfgpkg.Path()
 	if err != nil {
 		return err
 	}
 
-	cfg, err := loadConfig(cfgPath)
+	cfg, err := cfgpkg.Load(cfgPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return err
 		}
-		cfg = defaultConfig()
+		cfg = cfgpkg.Default()
 	}
 
 	for _, set := range sets {
@@ -398,12 +616,12 @@ func runConfig(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := applyConfigSet(&cfg, key, value); err != nil {
+		if err := cfgpkg.ApplySet(&cfg, key, value); err != nil {
 			return err
 		}
 	}
 
-	if err := writeConfig(cfgPath, cfg); err != nil {
+	if err := cfgpkg.Write(cfgPath, cfg); err != nil {
 		return err
 	}
 
@@ -412,7 +630,7 @@ func runConfig(args []string) error {
 }
 
 func showConfig() error {
-	cfgPath, err := configFilePath()
+	cfgPath, err := cfgpkg.Path()
 	if err != nil {
 		return err
 	}
@@ -422,14 +640,6 @@ func showConfig() error {
 	}
 	fmt.Print(string(data))
 	return nil
-}
-
-func configFilePath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".tabs", "config.toml"), nil
 }
 
 func daemonSocketPath() (string, error) {
@@ -650,230 +860,41 @@ func splitKeyValue(input string) (string, string, error) {
 	return key, value, nil
 }
 
-type Config struct {
-	Local      LocalConfig
-	Remote     RemoteConfig
-	Cursor     CursorConfig
-	ClaudeCode ClaudeCodeConfig
-}
-
-type LocalConfig struct {
-	UIPort   int
-	LogLevel string
-}
-
-type RemoteConfig struct {
-	ServerURL   string
-	APIKey      string
-	AutoPush    bool
-	DefaultTags []string
-}
-
-type CursorConfig struct {
-	DBPath       string
-	PollInterval int
-}
-
-type ClaudeCodeConfig struct {
-	ProjectsDir string
-}
-
-func defaultConfig() Config {
-	return Config{
-		Local: LocalConfig{
-			UIPort:   3787,
-			LogLevel: "info",
-		},
-		Remote: RemoteConfig{
-			ServerURL:   "https://tabs.company.com",
-			APIKey:      "",
-			AutoPush:    false,
-			DefaultTags: []string{},
-		},
-		Cursor: CursorConfig{
-			DBPath:       "",
-			PollInterval: 2,
-		},
-		ClaudeCode: ClaudeCodeConfig{
-			ProjectsDir: "",
-		},
-	}
-}
-
-func loadConfig(path string) (Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Config{}, err
-	}
-	return parseConfig(data)
-}
-
-func parseConfig(data []byte) (Config, error) {
-	cfg := defaultConfig()
-	var section string
-
-	scanner := bufio.NewScanner(bytes.NewReader(data))
-	for scanner.Scan() {
-		line := stripTomlComment(strings.TrimSpace(scanner.Text()))
-		if line == "" {
-			continue
-		}
-		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			section = strings.TrimSpace(line[1 : len(line)-1])
-			continue
-		}
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-		if err := applyConfigValue(&cfg, section, key, value); err != nil {
-			return Config{}, err
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return Config{}, err
-	}
-	return cfg, nil
-}
-
-func stripTomlComment(line string) string {
-	if !strings.Contains(line, "#") {
-		return line
-	}
-	var b strings.Builder
-	inQuotes := false
-	for i := 0; i < len(line); i++ {
-		ch := line[i]
-		if ch == '"' {
-			inQuotes = !inQuotes
-		}
-		if ch == '#' && !inQuotes {
-			break
-		}
-		b.WriteByte(ch)
-	}
-	return strings.TrimSpace(b.String())
-}
-
-func applyConfigValue(cfg *Config, section, key, raw string) error {
-	value, err := parseTomlValue(raw)
-	if err != nil {
-		return err
-	}
-
-	switch section {
-	case "local":
-		switch key {
-		case "ui_port":
-			port, err := toInt(value)
+func parsePushTags(values []string) ([]pushTag, error) {
+	var tags []pushTag
+	for _, raw := range values {
+		for _, entry := range splitComma(raw) {
+			tag, err := parseTagEntry(entry)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			cfg.Local.UIPort = port
-		case "log_level":
-			text, err := toString(value)
-			if err != nil {
-				return err
-			}
-			cfg.Local.LogLevel = text
-		}
-	case "remote":
-		switch key {
-		case "server_url":
-			text, err := toString(value)
-			if err != nil {
-				return err
-			}
-			cfg.Remote.ServerURL = text
-		case "api_key":
-			text, err := toString(value)
-			if err != nil {
-				return err
-			}
-			cfg.Remote.APIKey = text
-		case "auto_push":
-			b, err := toBool(value)
-			if err != nil {
-				return err
-			}
-			cfg.Remote.AutoPush = b
-		case "default_tags":
-			arr, err := toStringSlice(value)
-			if err != nil {
-				return err
-			}
-			cfg.Remote.DefaultTags = arr
-		}
-	case "cursor":
-		switch key {
-		case "db_path":
-			text, err := toString(value)
-			if err != nil {
-				return err
-			}
-			cfg.Cursor.DBPath = text
-		case "poll_interval":
-			interval, err := toInt(value)
-			if err != nil {
-				return err
-			}
-			cfg.Cursor.PollInterval = interval
-		}
-	case "claude_code":
-		switch key {
-		case "projects_dir":
-			text, err := toString(value)
-			if err != nil {
-				return err
-			}
-			cfg.ClaudeCode.ProjectsDir = text
-		}
-	}
-
-	return nil
-}
-
-func parseTomlValue(raw string) (interface{}, error) {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return "", nil
-	}
-	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-		inner := strings.TrimSpace(trimmed[1 : len(trimmed)-1])
-		if inner == "" {
-			return []string{}, nil
-		}
-		parts := splitComma(inner)
-		values := make([]string, 0, len(parts))
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part == "" {
+			if tag.Key == "" || tag.Value == "" {
 				continue
 			}
-			unquoted, err := strconv.Unquote(part)
-			if err != nil {
-				unquoted = part
-			}
-			values = append(values, unquoted)
+			tags = append(tags, tag)
 		}
-		return values, nil
 	}
-	if strings.HasPrefix(trimmed, "\"") && strings.HasSuffix(trimmed, "\"") {
-		unquoted, err := strconv.Unquote(trimmed)
-		if err != nil {
-			return nil, err
-		}
-		return unquoted, nil
+	return tags, nil
+}
+
+func parseTagEntry(raw string) (pushTag, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return pushTag{}, nil
 	}
-	if trimmed == "true" || trimmed == "false" {
-		return trimmed == "true", nil
+	parts := strings.SplitN(trimmed, ":", 2)
+	if len(parts) != 2 {
+		parts = strings.SplitN(trimmed, "=", 2)
 	}
-	if n, err := strconv.Atoi(trimmed); err == nil {
-		return n, nil
+	if len(parts) != 2 {
+		return pushTag{}, fmt.Errorf("invalid tag %q, expected key:value", trimmed)
 	}
-	return trimmed, nil
+	key := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+	if key == "" || value == "" {
+		return pushTag{}, fmt.Errorf("invalid tag %q, empty key or value", trimmed)
+	}
+	return pushTag{Key: key, Value: value}, nil
 }
 
 func splitComma(input string) []string {
@@ -882,235 +903,4 @@ func splitComma(input string) []string {
 		parts[i] = strings.TrimSpace(part)
 	}
 	return parts
-}
-
-func toString(value interface{}) (string, error) {
-	switch v := value.(type) {
-	case string:
-		return v, nil
-	case fmt.Stringer:
-		return v.String(), nil
-	default:
-		return "", fmt.Errorf("expected string, got %T", value)
-	}
-}
-
-func toInt(value interface{}) (int, error) {
-	switch v := value.(type) {
-	case int:
-		return v, nil
-	case int64:
-		return int(v), nil
-	case float64:
-		return int(v), nil
-	case string:
-		return strconv.Atoi(v)
-	default:
-		return 0, fmt.Errorf("expected int, got %T", value)
-	}
-}
-
-func toBool(value interface{}) (bool, error) {
-	switch v := value.(type) {
-	case bool:
-		return v, nil
-	case string:
-		return strconv.ParseBool(v)
-	default:
-		return false, fmt.Errorf("expected bool, got %T", value)
-	}
-}
-
-func toStringSlice(value interface{}) ([]string, error) {
-	switch v := value.(type) {
-	case []string:
-		return v, nil
-	case string:
-		if v == "" {
-			return []string{}, nil
-		}
-		return splitComma(v), nil
-	default:
-		return nil, fmt.Errorf("expected string slice, got %T", value)
-	}
-}
-
-func applyConfigSet(cfg *Config, key, rawValue string) error {
-	normalized := normalizeKey(key)
-
-	switch normalized {
-	case "remote.server_url", "server.url", "server_url":
-		value := strings.TrimSpace(rawValue)
-		if value == "" {
-			cfg.Remote.ServerURL = ""
-			return nil
-		}
-		if !strings.HasPrefix(value, "https://") {
-			return errors.New("server_url must start with https://")
-		}
-		cfg.Remote.ServerURL = value
-		return nil
-	case "remote.api_key", "api.key", "api_key", "api-key":
-		value := strings.TrimSpace(rawValue)
-		if value != "" && (!strings.HasPrefix(value, "tabs_") || len(value) < 36) {
-			return errors.New("api_key must start with tabs_ and be at least 36 characters")
-		}
-		cfg.Remote.APIKey = value
-		return nil
-	case "remote.auto_push", "auto.push", "auto_push", "auto-push":
-		b, err := strconv.ParseBool(rawValue)
-		if err != nil {
-			return errors.New("auto_push must be true or false")
-		}
-		cfg.Remote.AutoPush = b
-		return nil
-	case "remote.default_tags", "default.tags", "default_tags", "default-tags":
-		cfg.Remote.DefaultTags = parseTags(rawValue)
-		return nil
-	case "local.ui_port", "ui.port", "ui_port", "ui-port":
-		port, err := strconv.Atoi(rawValue)
-		if err != nil {
-			return errors.New("ui_port must be a number")
-		}
-		if port < 1024 || port > 65535 {
-			return errors.New("ui_port must be between 1024 and 65535")
-		}
-		cfg.Local.UIPort = port
-		return nil
-	case "local.log_level", "log.level", "log_level", "log-level":
-		level := strings.ToLower(strings.TrimSpace(rawValue))
-		if level == "" {
-			return errors.New("log_level cannot be empty")
-		}
-		switch level {
-		case "debug", "info", "warn", "error":
-			cfg.Local.LogLevel = level
-			return nil
-		default:
-			return errors.New("log_level must be one of: debug, info, warn, error")
-		}
-	case "cursor.db_path", "cursor.db-path", "db.path", "db_path", "db-path":
-		path := expandHome(strings.TrimSpace(rawValue))
-		cfg.Cursor.DBPath = path
-		return nil
-	case "cursor.poll_interval", "cursor.poll-interval", "poll.interval", "poll_interval", "poll-interval":
-		interval, err := strconv.Atoi(rawValue)
-		if err != nil {
-			return errors.New("poll_interval must be a number")
-		}
-		if interval < 1 || interval > 60 {
-			return errors.New("poll_interval must be between 1 and 60")
-		}
-		cfg.Cursor.PollInterval = interval
-		return nil
-	case "claude_code.projects_dir", "claude-code.projects-dir", "projects.dir", "projects_dir", "projects-dir":
-		path := expandHome(strings.TrimSpace(rawValue))
-		cfg.ClaudeCode.ProjectsDir = path
-		return nil
-	default:
-		return fmt.Errorf("unknown config key: %s", key)
-	}
-}
-
-func normalizeKey(key string) string {
-	key = strings.ToLower(strings.TrimSpace(key))
-	key = strings.ReplaceAll(key, "-", "_")
-	return key
-}
-
-func parseTags(input string) []string {
-	trimmed := strings.TrimSpace(input)
-	if trimmed == "" {
-		return []string{}
-	}
-	if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
-		var tags []string
-		if err := json.Unmarshal([]byte(trimmed), &tags); err == nil {
-			return tags
-		}
-	}
-	return splitComma(trimmed)
-}
-
-func expandHome(path string) string {
-	if path == "" || path[0] != '~' {
-		return path
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	if path == "~" {
-		return home
-	}
-	if strings.HasPrefix(path, "~/") {
-		return filepath.Join(home, path[2:])
-	}
-	return path
-}
-
-func writeConfig(path string, cfg Config) error {
-	if err := ensureTabsDir(); err != nil {
-		return err
-	}
-
-	content := formatConfig(cfg)
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	if _, err := file.WriteString(content); err != nil {
-		return err
-	}
-	return nil
-}
-
-func ensureTabsDir() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	tabsDir := filepath.Join(home, ".tabs")
-	if err := os.MkdirAll(tabsDir, 0700); err != nil {
-		return err
-	}
-	return nil
-}
-
-func formatConfig(cfg Config) string {
-	var b strings.Builder
-	b.WriteString("# tabs configuration file\n")
-	b.WriteString("# Generated by: tabs-cli config\n\n")
-
-	b.WriteString("[local]\n")
-	fmt.Fprintf(&b, "ui_port = %d\n", cfg.Local.UIPort)
-	fmt.Fprintf(&b, "log_level = %q\n\n", cfg.Local.LogLevel)
-
-	b.WriteString("[remote]\n")
-	fmt.Fprintf(&b, "server_url = %q\n", cfg.Remote.ServerURL)
-	fmt.Fprintf(&b, "api_key = %q\n", cfg.Remote.APIKey)
-	fmt.Fprintf(&b, "auto_push = %t\n", cfg.Remote.AutoPush)
-	fmt.Fprintf(&b, "default_tags = %s\n\n", formatStringArray(cfg.Remote.DefaultTags))
-
-	b.WriteString("[cursor]\n")
-	fmt.Fprintf(&b, "db_path = %q\n", cfg.Cursor.DBPath)
-	fmt.Fprintf(&b, "poll_interval = %d\n\n", cfg.Cursor.PollInterval)
-
-	b.WriteString("[claude_code]\n")
-	fmt.Fprintf(&b, "projects_dir = %q\n", cfg.ClaudeCode.ProjectsDir)
-
-	return b.String()
-}
-
-func formatStringArray(values []string) string {
-	if len(values) == 0 {
-		return "[]"
-	}
-	quoted := make([]string, 0, len(values))
-	for _, value := range values {
-		quoted = append(quoted, strconv.Quote(value))
-	}
-	return "[" + strings.Join(quoted, ", ") + "]"
 }

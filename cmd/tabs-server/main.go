@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/victorarias/tabs/internal/logging"
 	"github.com/victorarias/tabs/internal/server"
 )
 
@@ -23,6 +23,8 @@ var (
 )
 
 func main() {
+	logger := logging.New(os.Getenv("LOG_LEVEL"), os.Stdout).With("component", "server")
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "version":
@@ -30,17 +32,18 @@ func main() {
 			return
 		case "migrate":
 			if err := runMigrations(); err != nil {
-				log.Fatalf("migrate failed: %v", err)
+				logger.Error("migrate failed", "error", err)
+				os.Exit(1)
 			}
-			log.Println("migrations applied")
+			logger.Info("migrations applied")
 			return
 		}
 	}
 
-	logger := log.New(os.Stdout, "", log.LstdFlags|log.LUTC)
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		logger.Fatal("DATABASE_URL is required")
+		logger.Error("DATABASE_URL is required")
+		os.Exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -48,13 +51,15 @@ func main() {
 
 	db, err := server.OpenDB(ctx, dbURL)
 	if err != nil {
-		logger.Fatalf("database connection failed: %v", err)
+		logger.Error("database connection failed", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	if envBool(os.Getenv("MIGRATE_ON_START")) {
 		if err := server.RunMigrations(ctx, db, "migrations"); err != nil {
-			logger.Fatalf("migration failed: %v", err)
+			logger.Error("migration failed", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -64,12 +69,27 @@ func main() {
 		baseURL = fmt.Sprintf("http://localhost:%d", port)
 	}
 
-	srv := server.NewServer(db, baseURL, logger)
+	authCfg := server.AuthConfig{
+		Mode:          os.Getenv("AUTH_MODE"),
+		HeaderUser:    os.Getenv("AUTH_HEADER_USER"),
+		IAPAudience:   os.Getenv("IAP_AUDIENCE"),
+		IAPIssuer:     os.Getenv("IAP_ISSUER"),
+		IAPJWKSURL:    os.Getenv("IAP_JWKS_URL"),
+		IAPHTTPClient: nil,
+	}
+	auth, err := server.NewAuthenticator(authCfg)
+	if err != nil {
+		logger.Error("auth config invalid", "error", err)
+		os.Exit(1)
+	}
+
+	srv := server.NewServer(db, baseURL, logger, auth)
 	addr := ":" + strconv.Itoa(port)
-	logger.Printf("tabs-server %s (commit: %s, built: %s)", Version, Commit, BuildTime)
-	logger.Printf("listening on %s", addr)
+	logger.Info("starting", "version", Version, "commit", Commit, "built", BuildTime)
+	logger.Info("listening", "addr", addr)
 	if err := srv.ListenAndServe(ctx, addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		logger.Fatalf("server stopped: %v", err)
+		logger.Error("server stopped", "error", err)
+		os.Exit(1)
 	}
 }
 

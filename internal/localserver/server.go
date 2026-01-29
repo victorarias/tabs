@@ -195,6 +195,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 				"server_url":         cfg.Remote.ServerURL,
 				"api_key_configured": apiKeyConfigured,
 				"api_key_prefix":     apiKeyPrefix,
+				"default_tags":       cfg.Remote.DefaultTags,
 			},
 		}
 		s.writeJSON(w, http.StatusOK, resp)
@@ -271,7 +272,108 @@ func (s *Server) handlePushSession(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	s.writeError(w, http.StatusNotImplemented, "not_implemented", "Push not available in local server")
+	var payload struct {
+		SessionID string    `json:"session_id"`
+		Tool      string    `json:"tool"`
+		Tags      []pushTag `json:"tags"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		s.writeError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(payload.SessionID) == "" || strings.TrimSpace(payload.Tool) == "" {
+		s.writeError(w, http.StatusBadRequest, "invalid_request", "session_id and tool are required")
+		return
+	}
+
+	result, err := pushSessionToDaemon(s.baseDir, payload.SessionID, payload.Tool, payload.Tags)
+	if err != nil {
+		if resp, ok := err.(daemonResponseError); ok {
+			s.writeError(w, http.StatusBadRequest, resp.Code, resp.Message)
+			return
+		}
+		s.writeError(w, http.StatusInternalServerError, "server_error", "Failed to push session")
+		return
+	}
+
+	resp := map[string]interface{}{
+		"status":    "ok",
+		"remote_id": result.RemoteID,
+		"url":       result.URL,
+	}
+	s.writeJSON(w, http.StatusOK, resp)
+}
+
+type daemonResponseError struct {
+	Code    string
+	Message string
+}
+
+func (e daemonResponseError) Error() string {
+	return e.Message
+}
+
+type pushResult struct {
+	RemoteID string
+	URL      string
+}
+
+type pushTag struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func pushSessionToDaemon(baseDir, sessionID, tool string, tags []pushTag) (pushResult, error) {
+	socketPath := daemon.SocketPath(baseDir)
+	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
+	if err != nil {
+		return pushResult{}, err
+	}
+	defer conn.Close()
+
+	req := map[string]interface{}{
+		"version": protocolVersion,
+		"type":    "push_session",
+		"payload": map[string]interface{}{
+			"session_id": sessionID,
+			"tool":       tool,
+			"tags":       tags,
+		},
+	}
+	if err := conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		return pushResult{}, err
+	}
+	if err := json.NewEncoder(conn).Encode(req); err != nil {
+		return pushResult{}, err
+	}
+
+	var resp struct {
+		Version string          `json:"version"`
+		Status  string          `json:"status"`
+		Data    json.RawMessage `json:"data"`
+		Error   *struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
+		return pushResult{}, err
+	}
+	if resp.Status != "ok" {
+		if resp.Error != nil {
+			return pushResult{}, daemonResponseError{Code: resp.Error.Code, Message: resp.Error.Message}
+		}
+		return pushResult{}, daemonResponseError{Code: "server_error", Message: "push failed"}
+	}
+
+	var data struct {
+		RemoteID string `json:"remote_id"`
+		URL      string `json:"url"`
+	}
+	if err := json.Unmarshal(resp.Data, &data); err != nil {
+		return pushResult{}, err
+	}
+	return pushResult{RemoteID: data.RemoteID, URL: data.URL}, nil
 }
 
 func (s *Server) loadConfig() (config.Config, error) {

@@ -7,11 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/victorarias/tabs/internal/logging"
 )
 
 const protocolVersion = "1.0"
@@ -19,16 +21,16 @@ const protocolVersion = "1.0"
 type Server struct {
 	baseDir    string
 	socketPath string
-	logger     *log.Logger
+	logger     *slog.Logger
 	listener   net.Listener
 	wg         sync.WaitGroup
 	mu         sync.Mutex
 	state      *State
 }
 
-func NewServer(baseDir string, logger *log.Logger) *Server {
+func NewServer(baseDir string, logger *slog.Logger) *Server {
 	if logger == nil {
-		logger = log.New(os.Stdout, "", log.LstdFlags|log.LUTC)
+		logger = logging.New("info", os.Stdout)
 	}
 	return &Server{
 		baseDir:    baseDir,
@@ -109,7 +111,7 @@ func (s *Server) handleConn(conn net.Conn) {
 		if errors.Is(err, io.EOF) {
 			return
 		}
-		s.logger.Printf("read request failed: %v", err)
+		s.logger.Error("read request failed", "error", err)
 		return
 	}
 
@@ -127,6 +129,8 @@ func (s *Server) handleConn(conn net.Conn) {
 	switch req.Type {
 	case "capture_event":
 		s.handleCapture(conn, req.Payload)
+	case "push_session":
+		s.handlePush(conn, req.Payload)
 	case "daemon_status":
 		s.handleStatus(conn)
 	default:
@@ -180,6 +184,24 @@ func (s *Server) handleCapture(conn net.Conn, payload json.RawMessage) {
 		s.writeResponse(conn, okResponse(data))
 		return
 	}
+	if req.Tool == "cursor" {
+		eventsWritten, lastEventTime, err := s.captureCursor(req, sessionID, eventTime)
+		if err != nil {
+			s.writeResponse(conn, errorResponse("storage_error", err.Error()))
+			return
+		}
+		s.mu.Lock()
+		if eventsWritten > 0 {
+			s.state.RecordEvent(sessionID, lastEventTime, eventsWritten)
+		}
+		s.mu.Unlock()
+		data := map[string]interface{}{
+			"session_id":     sessionID,
+			"events_written": eventsWritten,
+		}
+		s.writeResponse(conn, okResponse(data))
+		return
+	}
 
 	normalized, eventJSON, err := normalizeEvent(req.Event, sessionID, req.Tool, eventTime)
 	if err != nil {
@@ -190,7 +212,7 @@ func (s *Server) handleCapture(conn net.Conn, payload json.RawMessage) {
 	s.mu.Lock()
 	cursor, cursorErr := loadCursorState(s.baseDir, sessionID)
 	if cursorErr != nil {
-		s.logger.Printf("cursor state load failed for %s: %v", sessionID, cursorErr)
+		s.logger.Warn("cursor state load failed", "session_id", sessionID, "error", cursorErr)
 	}
 	if cursor == nil {
 		s.mu.Unlock()
@@ -249,15 +271,43 @@ func (s *Server) handleStatus(conn net.Conn) {
 	s.writeResponse(conn, okResponse(status))
 }
 
+func (s *Server) handlePush(conn net.Conn, payload json.RawMessage) {
+	var req pushPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
+		s.writeResponse(conn, errorResponse("invalid_payload", "Invalid push payload"))
+		return
+	}
+
+	result, err := handlePushSession(s.baseDir, req)
+	if err != nil {
+		if perr, ok := err.(*pushError); ok {
+			s.writeResponse(conn, errorResponse(perr.Code, perr.Message))
+			return
+		}
+		s.writeResponse(conn, errorResponse("storage_error", err.Error()))
+		return
+	}
+
+	data := map[string]interface{}{
+		"remote_id": result.RemoteID,
+		"url":       result.URL,
+	}
+	if result.RemoteID == "" && result.URL == "" {
+		s.writeResponse(conn, okResponse(data))
+		return
+	}
+	s.writeResponse(conn, okResponse(data))
+}
+
 func (s *Server) writeResponse(conn net.Conn, resp response) {
 	payload, err := json.Marshal(resp)
 	if err != nil {
-		s.logger.Printf("marshal response failed: %v", err)
+		s.logger.Error("marshal response failed", "error", err)
 		return
 	}
 	payload = append(payload, '\n')
 	if _, err := conn.Write(payload); err != nil {
-		s.logger.Printf("write response failed: %v", err)
+		s.logger.Error("write response failed", "error", err)
 	}
 }
 

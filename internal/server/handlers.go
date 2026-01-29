@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -408,9 +409,9 @@ func normalizeUpload(req UploadRequest) (NormalizedSession, error) {
 			toolUseCount++
 		case "tool_result":
 			var data struct {
-				ToolUseID string `json:"tool_use_id"`
-				Content   string `json:"content"`
-				IsError   bool   `json:"is_error"`
+				ToolUseID string          `json:"tool_use_id"`
+				Content   json.RawMessage `json:"content"`
+				IsError   bool            `json:"is_error"`
 			}
 			if err := json.Unmarshal(event.Data, &data); err != nil {
 				return NormalizedSession{}, errors.New("invalid tool_result event")
@@ -426,7 +427,7 @@ func normalizeUpload(req UploadRequest) (NormalizedSession, error) {
 			if rec.Timestamp.IsZero() {
 				rec.Timestamp = ts
 			}
-			rec.Output = marshalOutput(data.Content)
+			rec.Output = normalizeToolOutput(data.Content)
 			rec.IsError = data.IsError
 		case "schema_version":
 			// ignore
@@ -507,11 +508,20 @@ func isValidTool(tool string) bool {
 	}
 }
 
-func marshalOutput(content string) json.RawMessage {
-	if content == "" {
+func normalizeToolOutput(content json.RawMessage) json.RawMessage {
+	trimmed := bytes.TrimSpace(content)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
 		return json.RawMessage("null")
 	}
-	payload, err := json.Marshal(map[string]string{"content": content})
+	var str string
+	if err := json.Unmarshal(trimmed, &str); err == nil {
+		payload, err := json.Marshal(map[string]string{"content": str})
+		if err == nil {
+			return payload
+		}
+		return json.RawMessage("null")
+	}
+	payload, err := json.Marshal(map[string]json.RawMessage{"content": trimmed})
 	if err != nil {
 		return json.RawMessage("null")
 	}
