@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tabs</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div class="logo" role="link" tabindex="0" data-nav="/" aria-label="tabs home">
+          <span class="logo-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2L8 8L6 12L8 16L12 22L16 16L18 12L16 8L12 2Z" opacity="0.9" />
+            </svg>
+          </span>
+          <span class="logo-text">tabs</span>
+        </div>
+        <div class="search-wrap" role="search">
+          <span class="search-icon" aria-hidden="true">Search</span>
+          <input
+            id="search-input"
+            class="search-input"
+            type="search"
+            placeholder="Search sessions, messages, files..."
+            aria-label="Search sessions"
+            autocomplete="off"
+          />
+          <button class="clear-btn" id="clear-search" type="button" aria-label="Clear search">Clear</button>
+        </div>
+        <div class="header-actions">
+          <a class="nav-link" href="/" data-nav>Home</a>
+          <a class="nav-link" href="/settings" data-nav>Settings</a>
+          <button class="ghost-btn" id="theme-toggle" type="button" aria-label="Toggle theme">Theme</button>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <div class="filters">
+          <label class="filter-label">
+            Tool
+            <select id="tool-filter" class="filter-select" aria-label="Filter by tool">
+              <option value="">All</option>
+            </select>
+          </label>
+        </div>
+        <div class="session-count" id="session-count">0 sessions</div>
+      </section>
+
+      <main id="app" class="main" aria-live="polite"></main>
+    </div>
+
+    <div id="toast" class="toast" aria-live="polite"></div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

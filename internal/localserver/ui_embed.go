@@ -1,0 +1,6 @@
+package localserver
+
+import "embed"
+
+//go:embed ui/*
+var uiFS embed.FS

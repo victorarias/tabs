@@ -6,6 +6,7 @@ type SessionSummary struct {
 	CreatedAt       string `json:"created_at"`
 	EndedAt         string `json:"ended_at,omitempty"`
 	Cwd             string `json:"cwd,omitempty"`
+	Summary         string `json:"summary,omitempty"`
 	DurationSeconds int    `json:"duration_seconds,omitempty"`
 	MessageCount    int    `json:"message_count"`
 	ToolUseCount    int    `json:"tool_use_count"`
@@ -13,12 +14,13 @@ type SessionSummary struct {
 }
 
 type SessionDetail struct {
-	SessionID string                   `json:"session_id"`
-	Tool      string                   `json:"tool"`
-	CreatedAt string                   `json:"created_at"`
-	EndedAt   string                   `json:"ended_at,omitempty"`
-	Cwd       string                   `json:"cwd,omitempty"`
-	Events    []map[string]interface{} `json:"events"`
+	SessionID       string                   `json:"session_id"`
+	Tool            string                   `json:"tool"`
+	CreatedAt       string                   `json:"created_at"`
+	EndedAt         string                   `json:"ended_at,omitempty"`
+	Cwd             string                   `json:"cwd,omitempty"`
+	DurationSeconds int                      `json:"duration_seconds,omitempty"`
+	Events          []map[string]interface{} `json:"events"`
 }
 
 type SessionsResponse struct {

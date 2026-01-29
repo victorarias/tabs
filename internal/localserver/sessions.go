@@ -170,6 +170,7 @@ func summarizeSession(path string, filter SessionFilter) (SessionSummary, bool, 
 	var overrideCounts bool
 	matchedQuery := filter.Q == ""
 	query := strings.ToLower(filter.Q)
+	var firstUserSummary string
 
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -253,6 +254,15 @@ func summarizeSession(path string, filter SessionFilter) (SessionSummary, bool, 
 			if !overrideCounts {
 				summary.MessageCount++
 			}
+			if firstUserSummary == "" {
+				if data, ok := event["data"].(map[string]interface{}); ok {
+					if role, ok := data["role"].(string); ok && role == "user" {
+						if content := extractMessageSummary(data); content != "" {
+							firstUserSummary = content
+						}
+					}
+				}
+			}
 			if !matchedQuery && query != "" {
 				if matchesQuery(event, query) {
 					matchedQuery = true
@@ -284,6 +294,12 @@ func summarizeSession(path string, filter SessionFilter) (SessionSummary, bool, 
 	if summary.DurationSeconds == 0 && !earliest.IsZero() && !latest.IsZero() && latest.After(earliest) {
 		summary.DurationSeconds = int(latest.Sub(earliest).Seconds())
 	}
+	if summary.Summary == "" {
+		summary.Summary = strings.TrimSpace(firstUserSummary)
+		if len(summary.Summary) > 160 {
+			summary.Summary = summary.Summary[:160] + "..."
+		}
+	}
 
 	if filter.Q != "" && !matchedQuery {
 		return summary, false, nil
@@ -302,6 +318,7 @@ func loadSessionDetail(path string) (SessionDetail, error) {
 	detail := SessionDetail{}
 	var earliest time.Time
 	var latest time.Time
+	var durationSeconds int
 
 	for {
 		line, err := reader.ReadBytes('\n')
@@ -367,6 +384,11 @@ func loadSessionDetail(path string) (SessionDetail, error) {
 				if !ts.IsZero() {
 					detail.EndedAt = ts.UTC().Format(time.RFC3339Nano)
 				}
+				if data, ok := event["data"].(map[string]interface{}); ok {
+					if value, ok := toInt(data["duration_seconds"]); ok {
+						durationSeconds = value
+					}
+				}
 			}
 		}
 
@@ -382,6 +404,12 @@ func loadSessionDetail(path string) (SessionDetail, error) {
 	}
 	if detail.EndedAt == "" && !latest.IsZero() {
 		detail.EndedAt = latest.UTC().Format(time.RFC3339Nano)
+	}
+	if durationSeconds == 0 && !earliest.IsZero() && !latest.IsZero() && latest.After(earliest) {
+		durationSeconds = int(latest.Sub(earliest).Seconds())
+	}
+	if durationSeconds > 0 {
+		detail.DurationSeconds = durationSeconds
 	}
 
 	return detail, nil
@@ -419,28 +447,78 @@ func sessionSortTime(summary SessionSummary) time.Time {
 }
 
 func matchesQuery(event map[string]interface{}, query string) bool {
-	data, ok := event["data"].(map[string]interface{})
-	if !ok {
-		return false
+	if query == "" {
+		return true
 	}
-	if content, ok := data["content"]; ok {
-		switch v := content.(type) {
-		case string:
-			return strings.Contains(strings.ToLower(v), query)
-		case []interface{}:
-			for _, item := range v {
-				if m, ok := item.(map[string]interface{}); ok {
-					if text, ok := m["text"].(string); ok {
-						if strings.Contains(strings.ToLower(text), query) {
-							return true
-						}
-					}
+	if tool, ok := event["tool"].(string); ok {
+		if strings.Contains(strings.ToLower(tool), query) {
+			return true
+		}
+	}
+	if data, ok := event["data"]; ok {
+		if containsQuery(data, query) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractMessageSummary(data map[string]interface{}) string {
+	if data == nil {
+		return ""
+	}
+	if value, ok := data["content"]; ok {
+		if text := extractText(value); text != "" {
+			return text
+		}
+	}
+	if value, ok := data["text"]; ok {
+		if text := extractText(value); text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
+func extractText(raw interface{}) string {
+	switch value := raw.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case []interface{}:
+		parts := make([]string, 0, len(value))
+		for _, item := range value {
+			if s, ok := item.(string); ok {
+				parts = append(parts, s)
+				continue
+			}
+			if m, ok := item.(map[string]interface{}); ok {
+				if text, ok := m["text"].(string); ok && text != "" {
+					parts = append(parts, text)
 				}
 			}
 		}
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	default:
+		return ""
 	}
-	if text, ok := data["text"].(string); ok {
-		return strings.Contains(strings.ToLower(text), query)
+}
+
+func containsQuery(value interface{}, query string) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.Contains(strings.ToLower(v), query)
+	case []interface{}:
+		for _, item := range v {
+			if containsQuery(item, query) {
+				return true
+			}
+		}
+	case map[string]interface{}:
+		for _, item := range v {
+			if containsQuery(item, query) {
+				return true
+			}
+		}
 	}
 	return false
 }

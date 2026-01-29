@@ -18,3 +18,5 @@ This file tracks learnings and progress across Ralph iterations.
 - Added local web API server (tabs-local + tabs-cli ui) with localhost-only bind and CSRF Origin/Host checks.
 - Implemented JSONL session scanning for /api/sessions and /api/sessions/:id with metadata extraction and search filtering.
 - Introduced internal/config package for shared config parsing/writing.
+- Implemented embedded local UI (HTML/CSS/JS) in tabs-local for timeline, session detail, and settings views with musical styling and animations.
+- Added session summary extraction from first user message plus recursive search matching across event data (tool names, file paths, cwd, content).

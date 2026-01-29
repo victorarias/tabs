@@ -71,15 +71,49 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/daemon/status", s.handleDaemonStatus)
 	mux.HandleFunc("/api/sessions/push", s.handlePushSession)
+	mux.HandleFunc("/app.js", s.handleStatic)
+	mux.HandleFunc("/styles.css", s.handleStatic)
 	mux.HandleFunc("/", s.handleRoot)
 
 	return csrfGuard(s.uiPort, mux)
 }
 
-func (s *Server) handleRoot(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" && !strings.HasPrefix(r.URL.Path, "/sessions/") && r.URL.Path != "/settings" {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	s.serveUI(w, r, "index.html")
+}
+
+func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/")
+	s.serveUI(w, r, name)
+}
+
+func (s *Server) serveUI(w http.ResponseWriter, r *http.Request, name string) {
+	data, err := uiFS.ReadFile("ui/" + name)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	if strings.HasSuffix(name, ".css") {
+		w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	} else if strings.HasSuffix(name, ".js") {
+		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
+	} else {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte("tabs local API running\n"))
+	_, _ = w.Write(data)
 }
 
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {

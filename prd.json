@@ -67,7 +67,7 @@
       "title": "Implement local UI with TanStack Start",
       "description": "Build SSR React UI for browsing sessions with timeline view, session detail, and search.",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "acceptance": [
         "Timeline shows sessions grouped by day",
         "Session detail shows messages and tool interactions",
