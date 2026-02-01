@@ -64,6 +64,7 @@ func main() {
 	defer stop()
 
 	daemon.StartCursorPoller(ctx, server, cfg)
+	daemon.StartCleanupRoutine(ctx, baseDir, cfg.Local.EmptySessionRetentionHours, logger)
 
 	errCh := make(chan error, 1)
 	go func() {

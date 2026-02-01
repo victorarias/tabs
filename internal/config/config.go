@@ -20,8 +20,9 @@ type Config struct {
 }
 
 type LocalConfig struct {
-	UIPort   int
-	LogLevel string
+	UIPort                     int
+	LogLevel                   string
+	EmptySessionRetentionHours int // 0 = keep forever, >0 = delete empty sessions older than N hours
 }
 
 type RemoteConfig struct {
@@ -43,8 +44,9 @@ type ClaudeCodeConfig struct {
 func Default() Config {
 	return Config{
 		Local: LocalConfig{
-			UIPort:   3787,
-			LogLevel: "info",
+			UIPort:                     3787,
+			LogLevel:                   "info",
+			EmptySessionRetentionHours: 24, // Delete empty sessions after 24 hours by default
 		},
 		Remote: RemoteConfig{
 			ServerURL:   "https://tabs.company.com",
@@ -148,6 +150,12 @@ func ApplyValue(cfg *Config, section, key, raw string) error {
 				return err
 			}
 			cfg.Local.LogLevel = text
+		case "empty_session_retention_hours":
+			hours, err := toInt(value)
+			if err != nil {
+				return err
+			}
+			cfg.Local.EmptySessionRetentionHours = hours
 		}
 	case "remote":
 		switch key {
@@ -359,6 +367,16 @@ func ApplySet(cfg *Config, key, rawValue string) error {
 		default:
 			return errors.New("log_level must be one of: debug, info, warn, error")
 		}
+	case "local.empty_session_retention_hours", "empty_session_retention_hours", "empty-session-retention-hours":
+		hours, err := strconv.Atoi(rawValue)
+		if err != nil {
+			return errors.New("empty_session_retention_hours must be a number")
+		}
+		if hours < 0 {
+			return errors.New("empty_session_retention_hours must be >= 0")
+		}
+		cfg.Local.EmptySessionRetentionHours = hours
+		return nil
 	case "cursor.db_path", "cursor.db-path", "db.path", "db_path", "db-path":
 		path := ExpandHome(strings.TrimSpace(rawValue))
 		cfg.Cursor.DBPath = path
@@ -456,7 +474,8 @@ func Format(cfg Config) string {
 
 	b.WriteString("[local]\n")
 	fmt.Fprintf(&b, "ui_port = %d\n", cfg.Local.UIPort)
-	fmt.Fprintf(&b, "log_level = %q\n\n", cfg.Local.LogLevel)
+	fmt.Fprintf(&b, "log_level = %q\n", cfg.Local.LogLevel)
+	fmt.Fprintf(&b, "empty_session_retention_hours = %d\n\n", cfg.Local.EmptySessionRetentionHours)
 
 	b.WriteString("[remote]\n")
 	fmt.Fprintf(&b, "server_url = %q\n", cfg.Remote.ServerURL)

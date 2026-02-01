@@ -25,6 +25,7 @@ function Timeline() {
   const [sessions, setSessions] = React.useState<SessionSummary[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState('')
+  const [showEmpty, setShowEmpty] = React.useState(false)
 
   const [toolOptions, setToolOptions] = React.useState<string[]>([])
 
@@ -79,7 +80,13 @@ function Timeline() {
     }
   }, [query, tool, date, cwd])
 
-  const grouped = groupByDate(sessions)
+  // Filter out empty sessions (message_count === 0) unless showEmpty is true
+  const filteredSessions = showEmpty
+    ? sessions
+    : sessions.filter(s => s.message_count > 0)
+  const hiddenCount = sessions.length - filteredSessions.length
+
+  const grouped = groupByDate(filteredSessions)
 
   return (
     <main className="main">
@@ -151,8 +158,20 @@ function Timeline() {
             />
           </label>
         </div>
-        <div className="session-count">
-          {loading ? 'scanning...' : `${sessions.length} sessions`}
+        <div className="toolbar-right">
+          <button
+            className={`empty-toggle ${showEmpty ? 'active' : ''}`}
+            onClick={() => setShowEmpty(!showEmpty)}
+            title={showEmpty ? 'Hide empty sessions' : 'Show empty sessions'}
+          >
+            <span className="empty-toggle-indicator" />
+            <span className="empty-toggle-label">
+              {hiddenCount > 0 && !showEmpty ? `${hiddenCount} empty` : 'empty'}
+            </span>
+          </button>
+          <div className="session-count">
+            {loading ? 'scanning...' : `${filteredSessions.length} sessions`}
+          </div>
         </div>
       </section>
 
@@ -162,7 +181,7 @@ function Timeline() {
           <h2>Connection failed</h2>
           <p>{error}</p>
         </div>
-      ) : sessions.length === 0 ? (
+      ) : filteredSessions.length === 0 ? (
         <div className="empty-state">
           <div className="icon">_</div>
           <h2>No sessions found</h2>

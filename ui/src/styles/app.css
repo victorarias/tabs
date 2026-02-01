@@ -1532,3 +1532,83 @@ a:hover {
 .settings-card .ghost-btn {
   margin-top: var(--space-4);
 }
+
+/* ============================================
+   EMPTY SESSIONS TOGGLE
+   ============================================ */
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.empty-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 200ms ease;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--fg-muted);
+  letter-spacing: 0.05em;
+}
+
+.empty-toggle:hover {
+  border-color: var(--fg-muted);
+  color: var(--fg-tertiary);
+}
+
+.empty-toggle.active {
+  border-color: var(--border-accent);
+  color: var(--fg-secondary);
+}
+
+.empty-toggle-indicator {
+  position: relative;
+  width: 20px;
+  height: 10px;
+  background: var(--bg-elevated);
+  border-radius: 5px;
+  transition: all 200ms var(--ease-out-expo);
+  overflow: hidden;
+}
+
+.empty-toggle-indicator::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 6px;
+  height: 6px;
+  background: var(--fg-muted);
+  border-radius: 50%;
+  transition: all 200ms var(--ease-out-expo);
+}
+
+.empty-toggle.active .empty-toggle-indicator {
+  background: var(--accent-subtle);
+}
+
+.empty-toggle.active .empty-toggle-indicator::before {
+  left: 12px;
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+.empty-toggle-label {
+  text-transform: uppercase;
+}
+
+/* Responsive adjustments for toolbar-right */
+@media (max-width: 768px) {
+  .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
