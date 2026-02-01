@@ -13,6 +13,7 @@ LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main
 # Directories
 BIN_DIR := bin
 BUILD_DIR := build
+PREFIX ?= $(HOME)/.local
 
 all: build
 
@@ -48,9 +49,10 @@ test-coverage:
 	go tool cover -html=coverage.out -o coverage.html
 
 install: build
-	@echo "Installing binaries..."
-	cp $(BIN_DIR)/tabs-cli /usr/local/bin/tabs-cli
-	cp $(BIN_DIR)/tabs-daemon /usr/local/bin/tabs-daemon
+	@echo "Installing binaries to $(PREFIX)/bin..."
+	@mkdir -p $(PREFIX)/bin
+	install -m 755 $(BIN_DIR)/tabs-cli $(PREFIX)/bin/tabs-cli
+	install -m 755 $(BIN_DIR)/tabs-daemon $(PREFIX)/bin/tabs-daemon
 
 clean:
 	@echo "Cleaning build artifacts..."
@@ -94,7 +96,7 @@ help:
 	@echo "  build-server   - Build tabs-server only"
 	@echo "  test           - Run tests"
 	@echo "  test-coverage  - Run tests with coverage report"
-	@echo "  install        - Install binaries to /usr/local/bin"
+	@echo "  install        - Install binaries to PREFIX/bin (default: ~/.local/bin)"
 	@echo "  clean          - Remove build artifacts"
 	@echo "  dev-daemon     - Run daemon in development mode"
 	@echo "  dev-cli        - Run CLI in development mode"
