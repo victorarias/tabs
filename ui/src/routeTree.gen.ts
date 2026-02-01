@@ -12,10 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
-import { Route as ApiSessionsRouteImport } from './routes/api/sessions'
-import { Route as ApiConfigRouteImport } from './routes/api/config'
-import { Route as ApiSessionsPushRouteImport } from './routes/api/sessions.push'
-import { Route as ApiSessionsSessionIdRouteImport } from './routes/api/sessions.$sessionId'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
@@ -32,90 +28,34 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   path: '/sessions/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiSessionsRoute = ApiSessionsRouteImport.update({
-  id: '/api/sessions',
-  path: '/api/sessions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiConfigRoute = ApiConfigRouteImport.update({
-  id: '/api/config',
-  path: '/api/config',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSessionsPushRoute = ApiSessionsPushRouteImport.update({
-  id: '/push',
-  path: '/push',
-  getParentRoute: () => ApiSessionsRoute,
-} as any)
-const ApiSessionsSessionIdRoute = ApiSessionsSessionIdRouteImport.update({
-  id: '/$sessionId',
-  path: '/$sessionId',
-  getParentRoute: () => ApiSessionsRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
-  '/api/config': typeof ApiConfigRoute
-  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/api/sessions/$sessionId': typeof ApiSessionsSessionIdRoute
-  '/api/sessions/push': typeof ApiSessionsPushRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
-  '/api/config': typeof ApiConfigRoute
-  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/api/sessions/$sessionId': typeof ApiSessionsSessionIdRoute
-  '/api/sessions/push': typeof ApiSessionsPushRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/settings': typeof SettingsRoute
-  '/api/config': typeof ApiConfigRoute
-  '/api/sessions': typeof ApiSessionsRouteWithChildren
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
-  '/api/sessions/$sessionId': typeof ApiSessionsSessionIdRoute
-  '/api/sessions/push': typeof ApiSessionsPushRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/settings'
-    | '/api/config'
-    | '/api/sessions'
-    | '/sessions/$sessionId'
-    | '/api/sessions/$sessionId'
-    | '/api/sessions/push'
+  fullPaths: '/' | '/settings' | '/sessions/$sessionId'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/settings'
-    | '/api/config'
-    | '/api/sessions'
-    | '/sessions/$sessionId'
-    | '/api/sessions/$sessionId'
-    | '/api/sessions/push'
-  id:
-    | '__root__'
-    | '/'
-    | '/settings'
-    | '/api/config'
-    | '/api/sessions'
-    | '/sessions/$sessionId'
-    | '/api/sessions/$sessionId'
-    | '/api/sessions/push'
+  to: '/' | '/settings' | '/sessions/$sessionId'
+  id: '__root__' | '/' | '/settings' | '/sessions/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SettingsRoute: typeof SettingsRoute
-  ApiConfigRoute: typeof ApiConfigRoute
-  ApiSessionsRoute: typeof ApiSessionsRouteWithChildren
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
 }
 
@@ -142,67 +82,14 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/sessions': {
-      id: '/api/sessions'
-      path: '/api/sessions'
-      fullPath: '/api/sessions'
-      preLoaderRoute: typeof ApiSessionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/config': {
-      id: '/api/config'
-      path: '/api/config'
-      fullPath: '/api/config'
-      preLoaderRoute: typeof ApiConfigRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/sessions/push': {
-      id: '/api/sessions/push'
-      path: '/push'
-      fullPath: '/api/sessions/push'
-      preLoaderRoute: typeof ApiSessionsPushRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
-    '/api/sessions/$sessionId': {
-      id: '/api/sessions/$sessionId'
-      path: '/$sessionId'
-      fullPath: '/api/sessions/$sessionId'
-      preLoaderRoute: typeof ApiSessionsSessionIdRouteImport
-      parentRoute: typeof ApiSessionsRoute
-    }
   }
 }
-
-interface ApiSessionsRouteChildren {
-  ApiSessionsSessionIdRoute: typeof ApiSessionsSessionIdRoute
-  ApiSessionsPushRoute: typeof ApiSessionsPushRoute
-}
-
-const ApiSessionsRouteChildren: ApiSessionsRouteChildren = {
-  ApiSessionsSessionIdRoute: ApiSessionsSessionIdRoute,
-  ApiSessionsPushRoute: ApiSessionsPushRoute,
-}
-
-const ApiSessionsRouteWithChildren = ApiSessionsRoute._addFileChildren(
-  ApiSessionsRouteChildren,
-)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SettingsRoute: SettingsRoute,
-  ApiConfigRoute: ApiConfigRoute,
-  ApiSessionsRoute: ApiSessionsRouteWithChildren,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}
