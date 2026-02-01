@@ -1,25 +1,32 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import * as React from 'react'
-import type { SessionSummary } from '~/utils/localSessions'
+
+type SessionSummary = {
+  session_id: string
+  tool: string
+  created_at: string
+  ended_at?: string
+  cwd?: string
+  summary?: string
+  duration_seconds?: number
+  message_count: number
+  tool_use_count: number
+}
 
 export const Route = createFileRoute('/')({
-  loader: async () => ({ sessions: [] as SessionSummary[] }),
   component: Timeline,
 })
 
 function Timeline() {
-  const data = Route.useLoaderData()
   const [query, setQuery] = React.useState('')
   const [tool, setTool] = React.useState('')
   const [date, setDate] = React.useState('')
   const [cwd, setCwd] = React.useState('')
-  const [sessions, setSessions] = React.useState(data.sessions || [])
+  const [sessions, setSessions] = React.useState<SessionSummary[]>([])
   const [loading, setLoading] = React.useState(false)
   const [error, setError] = React.useState('')
 
-  const [toolOptions, setToolOptions] = React.useState(() => {
-    return Array.from(new Set((data.sessions || []).map((s) => s.tool).filter(Boolean))).sort()
-  })
+  const [toolOptions, setToolOptions] = React.useState<string[]>([])
 
   React.useEffect(() => {
     setToolOptions((prev) => {

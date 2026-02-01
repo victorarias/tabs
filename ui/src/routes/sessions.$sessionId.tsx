@@ -1,7 +1,16 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import * as React from 'react'
 import { CodeBlock } from '~/components/CodeBlock'
-import type { SessionDetail } from '~/utils/localSessions'
+
+type SessionDetail = {
+  session_id: string
+  tool: string
+  created_at: string
+  ended_at?: string
+  cwd?: string
+  duration_seconds?: number
+  events: Record<string, unknown>[]
+}
 
 export const Route = createFileRoute('/sessions/$sessionId')({
   component: SessionDetailView,
