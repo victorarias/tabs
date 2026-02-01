@@ -71,47 +71,63 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("/api/config", s.handleConfig)
 	mux.HandleFunc("/api/daemon/status", s.handleDaemonStatus)
 	mux.HandleFunc("/api/sessions/push", s.handlePushSession)
-	mux.HandleFunc("/app.js", s.handleStatic)
-	mux.HandleFunc("/styles.css", s.handleStatic)
-	mux.HandleFunc("/", s.handleRoot)
+	mux.HandleFunc("/", s.handleStaticOrSPAFallback)
 
 	return csrfGuard(s.uiPort, mux)
 }
 
-func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" && !strings.HasPrefix(r.URL.Path, "/sessions/") && r.URL.Path != "/settings" {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
+func (s *Server) handleStaticOrSPAFallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	s.serveUI(w, r, "index.html")
-}
 
-func (s *Server) handleStatic(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+	// Try to serve the exact file first
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	if path == "" {
+		path = "index.html"
+	}
+
+	data, err := uiFS.ReadFile("ui/" + path)
+	if err == nil {
+		s.serveWithContentType(w, path, data)
 		return
 	}
-	name := strings.TrimPrefix(r.URL.Path, "/")
-	s.serveUI(w, r, name)
-}
 
-func (s *Server) serveUI(w http.ResponseWriter, r *http.Request, name string) {
-	data, err := uiFS.ReadFile("ui/" + name)
+	// File not found - serve index.html for SPA client-side routing
+	data, err = uiFS.ReadFile("ui/index.html")
 	if err != nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	if strings.HasSuffix(name, ".css") {
-		w.Header().Set("Content-Type", "text/css; charset=utf-8")
-	} else if strings.HasSuffix(name, ".js") {
-		w.Header().Set("Content-Type", "application/javascript; charset=utf-8")
-	} else {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(data)
+}
+
+func (s *Server) serveWithContentType(w http.ResponseWriter, path string, data []byte) {
+	contentType := "application/octet-stream"
+	switch {
+	case strings.HasSuffix(path, ".html"):
+		contentType = "text/html; charset=utf-8"
+	case strings.HasSuffix(path, ".css"):
+		contentType = "text/css; charset=utf-8"
+	case strings.HasSuffix(path, ".js"):
+		contentType = "application/javascript; charset=utf-8"
+	case strings.HasSuffix(path, ".json"):
+		contentType = "application/json; charset=utf-8"
+	case strings.HasSuffix(path, ".svg"):
+		contentType = "image/svg+xml"
+	case strings.HasSuffix(path, ".png"):
+		contentType = "image/png"
+	case strings.HasSuffix(path, ".ico"):
+		contentType = "image/x-icon"
+	case strings.HasSuffix(path, ".woff2"):
+		contentType = "font/woff2"
+	case strings.HasSuffix(path, ".woff"):
+		contentType = "font/woff"
 	}
+	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(data)
 }
