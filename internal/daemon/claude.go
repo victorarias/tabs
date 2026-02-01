@@ -269,11 +269,11 @@ func claudeEventsFromLine(line []byte, sessionID string, fallback time.Time) ([]
 		}
 	}
 
-	if toolUse := extractToolUse(record); toolUse != nil {
+	for _, toolUse := range extractToolUse(record) {
 		events = append(events, buildEvent("tool_use", sessionID, "claude-code", ts, toolUse))
 	}
 
-	if toolResult := extractToolResult(record); toolResult != nil {
+	for _, toolResult := range extractToolResult(record) {
 		events = append(events, buildEvent("tool_result", sessionID, "claude-code", ts, toolResult))
 	}
 
@@ -329,8 +329,21 @@ func normalizeContent(raw interface{}) []map[string]interface{} {
 			switch part := item.(type) {
 			case map[string]interface{}:
 				partType, _ := part["type"].(string)
-				partText, _ := part["text"].(string)
-				if partType == "" || partText == "" {
+				if partType == "" {
+					continue
+				}
+				// Extract text based on content type
+				var partText string
+				switch partType {
+				case "text":
+					partText, _ = part["text"].(string)
+				case "thinking":
+					partText, _ = part["thinking"].(string)
+				default:
+					// Skip tool_use and other types (handled separately)
+					continue
+				}
+				if partText == "" {
 					continue
 				}
 				content = append(content, map[string]interface{}{
@@ -357,49 +370,79 @@ func normalizeContent(raw interface{}) []map[string]interface{} {
 	}
 }
 
-func extractToolUse(record map[string]interface{}) map[string]interface{} {
-	raw, ok := record["tool_use"].(map[string]interface{})
+func extractToolUse(record map[string]interface{}) []map[string]interface{} {
+	content := extractMessageContent(record)
+	contentArray, ok := content.([]interface{})
 	if !ok {
 		return nil
 	}
-	toolUseID := toStringValue(raw["id"])
-	if toolUseID == "" {
-		toolUseID = toStringValue(raw["tool_use_id"])
+
+	var toolUses []map[string]interface{}
+	for _, item := range contentArray {
+		block, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		blockType, _ := block["type"].(string)
+		if blockType != "tool_use" {
+			continue
+		}
+
+		toolUseID := toStringValue(block["id"])
+		if toolUseID == "" {
+			toolUseID = toStringValue(block["tool_use_id"])
+		}
+		toolName := toStringValue(block["name"])
+		if toolName == "" {
+			toolName = toStringValue(block["tool_name"])
+		}
+		input, _ := block["input"].(map[string]interface{})
+		if toolUseID == "" || toolName == "" {
+			continue
+		}
+		toolUses = append(toolUses, map[string]interface{}{
+			"tool_use_id": toolUseID,
+			"tool_name":   toolName,
+			"input":       input,
+		})
 	}
-	toolName := toStringValue(raw["name"])
-	if toolName == "" {
-		toolName = toStringValue(raw["tool_name"])
-	}
-	input, _ := raw["input"].(map[string]interface{})
-	if toolUseID == "" || toolName == "" {
-		return nil
-	}
-	return map[string]interface{}{
-		"tool_use_id": toolUseID,
-		"tool_name":   toolName,
-		"input":       input,
-	}
+	return toolUses
 }
 
-func extractToolResult(record map[string]interface{}) map[string]interface{} {
-	raw, ok := record["tool_result"].(map[string]interface{})
+func extractToolResult(record map[string]interface{}) []map[string]interface{} {
+	content := extractMessageContent(record)
+	contentArray, ok := content.([]interface{})
 	if !ok {
 		return nil
 	}
-	toolUseID := toStringValue(raw["tool_use_id"])
-	if toolUseID == "" {
-		toolUseID = toStringValue(raw["id"])
+
+	var toolResults []map[string]interface{}
+	for _, item := range contentArray {
+		block, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		blockType, _ := block["type"].(string)
+		if blockType != "tool_result" {
+			continue
+		}
+
+		toolUseID := toStringValue(block["tool_use_id"])
+		if toolUseID == "" {
+			toolUseID = toStringValue(block["id"])
+		}
+		resultContent := block["content"]
+		isError, _ := block["is_error"].(bool)
+		if toolUseID == "" {
+			continue
+		}
+		toolResults = append(toolResults, map[string]interface{}{
+			"tool_use_id": toolUseID,
+			"content":     resultContent,
+			"is_error":    isError,
+		})
 	}
-	content := raw["content"]
-	isError, _ := raw["is_error"].(bool)
-	if toolUseID == "" {
-		return nil
-	}
-	return map[string]interface{}{
-		"tool_use_id": toolUseID,
-		"content":     content,
-		"is_error":    isError,
-	}
+	return toolResults
 }
 
 func toStringValue(value interface{}) string {
