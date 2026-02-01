@@ -1,6 +1,6 @@
 # Makefile for tabs
 
-.PHONY: all build build-cli build-daemon build-server build-local test test-unit test-integration test-golden test-golden-update install clean
+.PHONY: all build build-ui build-cli build-daemon build-server build-local test test-unit test-integration test-golden test-golden-update install clean dev dev-ui dev-api
 
 # Version
 VERSION ?= 0.1.0-dev
@@ -19,10 +19,27 @@ all: build
 
 build: build-cli build-daemon build-server build-local
 
-build-cli:
+build-ui:
+	@echo "Building UI..."
+	cd ui && pnpm install && pnpm run build
+
+build-cli: build-ui
 	@echo "Building tabs-cli..."
 	@mkdir -p $(BIN_DIR)
 	go build $(LDFLAGS) -o $(BIN_DIR)/tabs-cli ./cmd/tabs-cli
+
+dev-ui:
+	cd ui && pnpm run dev
+
+dev-api:
+	go run ./cmd/tabs-cli ui
+
+dev:
+	@echo "Starting Go API on :3787 and Vite on :3000..."
+	@echo "Open http://localhost:3000 for hot-reload dev"
+	@trap 'kill 0' EXIT; \
+		go run ./cmd/tabs-cli ui & \
+		cd ui && pnpm run dev
 
 build-daemon:
 	@echo "Building tabs-daemon..."
