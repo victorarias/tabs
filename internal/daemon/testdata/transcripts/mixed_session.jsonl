@@ -1,0 +1,9 @@
+{"type":"queue-operation","operation":"dequeue","timestamp":"2026-01-01T11:59:59Z","sessionId":"test-session"}
+{"type":"file-history-snapshot","messageId":"snap-1","snapshot":{"messageId":"snap-1","trackedFileBackups":{},"timestamp":"2026-01-01T12:00:00Z"},"isSnapshotUpdate":false}
+{"type":"user","message":{"role":"user","content":"What is the weather today?"},"sessionId":"test-session","timestamp":"2026-01-01T12:00:00Z","uuid":"user-1"}
+{"type":"progress","data":{"type":"hook_progress","hookEvent":"UserPromptSubmit"},"timestamp":"2026-01-01T12:00:00.5Z"}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"thinking","text":"The user is asking about weather..."},{"type":"text","text":"I don't have access to real-time weather data."}]},"sessionId":"test-session","timestamp":"2026-01-01T12:00:01Z","uuid":"asst-1"}
+{"type":"system","subtype":"turn_duration","durationMs":1000,"timestamp":"2026-01-01T12:00:02Z"}
+{"type":"user","message":{"role":"user","content":"Thanks!"},"sessionId":"test-session","timestamp":"2026-01-01T12:00:03Z","uuid":"user-2"}
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"text","text":"You're welcome!"}]},"sessionId":"test-session","timestamp":"2026-01-01T12:00:04Z","uuid":"asst-2"}
+{"type":"summary","summary":"Weather inquiry conversation","leafUuid":"asst-2"}

@@ -1,0 +1,22 @@
+[
+  {
+    "data": {
+      "content": [
+        {
+          "text": "Let me analyze this request...",
+          "type": "thinking"
+        },
+        {
+          "text": "Here is my response to your question.",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-4-5-20251101",
+      "role": "assistant"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:01Z",
+    "tool": "claude-code"
+  }
+]

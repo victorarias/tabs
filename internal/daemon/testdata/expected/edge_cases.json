@@ -1,0 +1,17 @@
+[
+  {
+    "data": {
+      "content": [
+        {
+          "text": "valid message after edge cases",
+          "type": "text"
+        }
+      ],
+      "role": "user"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:03Z",
+    "tool": "claude-code"
+  }
+]

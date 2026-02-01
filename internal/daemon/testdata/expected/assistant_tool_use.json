@@ -1,0 +1,31 @@
+[
+  {
+    "data": {
+      "content": [
+        {
+          "text": "I will read the file for you.",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-4-5-20251101",
+      "role": "assistant"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:01Z",
+    "tool": "claude-code"
+  },
+  {
+    "data": {
+      "input": {
+        "file_path": "/tmp/test.txt"
+      },
+      "tool_name": "Read",
+      "tool_use_id": "toolu_123"
+    },
+    "event_type": "tool_use",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T00:00:00Z",
+    "tool": "claude-code"
+  }
+]
