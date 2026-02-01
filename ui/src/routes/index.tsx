@@ -77,26 +77,37 @@ function Timeline() {
   return (
     <main className="main">
       <header className="app-header">
-        <div className="logo" role="link">
-          <span className="logo-text">tabs</span>
+        <Link className="logo" to="/">
+          <span className="logo-text">TABS</span>
           <span className="logo-sub">local</span>
-        </div>
+        </Link>
         <div className="search-wrap" role="search">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.35-4.35" />
+          </svg>
           <input
             className="search-input"
             placeholder="Search sessions, messages, files..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
+          {query && (
+            <button className="clear-btn visible" onClick={() => setQuery('')} aria-label="Clear search">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
-        <div className="header-actions">
+        <nav className="header-actions">
           <Link className="nav-link" to="/" activeOptions={{ exact: true }}>
             Sessions
           </Link>
           <Link className="nav-link" to="/settings">
             Settings
           </Link>
-        </div>
+        </nav>
       </header>
 
       <section className="toolbar">
@@ -108,10 +119,10 @@ function Timeline() {
               value={tool}
               onChange={(e) => setTool(e.target.value)}
             >
-              <option value="">All</option>
+              <option value="">All tools</option>
               {toolOptions.map((t) => (
                 <option key={t} value={t}>
-                  {t}
+                  {formatToolName(t)}
                 </option>
               ))}
             </select>
@@ -119,63 +130,65 @@ function Timeline() {
           <label className="filter-label">
             Date
             <input
-              className="search-input"
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
           </label>
           <label className="filter-label">
-            CWD
+            Directory
             <input
-              className="search-input"
               value={cwd}
               onChange={(e) => setCwd(e.target.value)}
-              placeholder="/home/user/projects"
+              placeholder="~/projects/..."
             />
           </label>
         </div>
         <div className="session-count">
-          {loading ? 'Loading…' : `${sessions.length} sessions`}
+          {loading ? 'scanning...' : `${sessions.length} sessions`}
         </div>
       </section>
 
       {error ? (
         <div className="empty-state">
-          <div className="icon">Alert</div>
-          <h2>Unable to load sessions</h2>
+          <div className="icon">!</div>
+          <h2>Connection failed</h2>
           <p>{error}</p>
         </div>
       ) : sessions.length === 0 ? (
         <div className="empty-state">
-          <div className="icon">Tabs</div>
-          <h2>No sessions yet</h2>
-          <p>Start using Claude Code or Cursor and your sessions will appear here.</p>
+          <div className="icon">_</div>
+          <h2>No sessions found</h2>
+          <p>Start a session with Claude Code or Cursor to see your history here.</p>
         </div>
       ) : (
         grouped.map(([day, items]) => (
           <section className="timeline-group" key={day}>
-            <div className="timeline-date">{formatDayLabel(day)}</div>
-            {items.map((session) => (
+            <h2 className="timeline-date">{formatDayLabel(day)}</h2>
+            {items.map((session, idx) => (
               <Link
-                className="session-card"
+                className="session-card note-in"
                 key={session.session_id}
                 to="/sessions/$sessionId"
                 params={{ sessionId: session.session_id }}
+                style={{ animationDelay: `${Math.min(idx * 50, 400)}ms` }}
               >
                 <div className="session-meta">
-                  <span>{formatTime(session.created_at || session.ended_at || '')}</span>
-                  <span className="tool-badge">{session.tool}</span>
+                  <time>{formatTime(session.created_at || session.ended_at || '')}</time>
+                  <span className="tool-badge" data-tool={getToolId(session.tool)}>
+                    {formatToolName(session.tool)}
+                  </span>
                   <span>{formatDuration(session.duration_seconds ?? 0)}</span>
                 </div>
-                {session.cwd ? (
+                {session.cwd && (
                   <div className="session-path">{shortenPath(session.cwd)}</div>
-                ) : null}
+                )}
                 <div className="session-title">
-                  {session.summary || `Session ${session.session_id}`}
+                  {session.summary || `Session ${session.session_id.slice(0, 8)}`}
                 </div>
                 <div className="session-stats">
-                  {session.message_count} messages · {session.tool_use_count} tools
+                  <span>{session.message_count} msgs</span>
+                  <span>{session.tool_use_count} tools</span>
                 </div>
               </Link>
             ))}
@@ -224,4 +237,17 @@ function shortenPath(value: string) {
   const parts = value.split('/').filter(Boolean)
   if (parts.length <= 3) return value
   return `.../${parts.slice(-3).join('/')}`
+}
+
+function formatToolName(tool: string) {
+  const t = tool?.toLowerCase().replace(/-/g, '_') || ''
+  if (t === 'claude_code') return 'Claude'
+  if (t === 'cursor') return 'Cursor'
+  // Capitalize first letter of each word
+  return tool?.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || ''
+}
+
+function getToolId(tool: string) {
+  // Normalize to underscore format for CSS selectors
+  return tool?.toLowerCase().replace(/[-\s]+/g, '_') || ''
 }

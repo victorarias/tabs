@@ -110,20 +110,31 @@ function SessionDetailView() {
     <main className="main">
       <header className="session-header">
         <Link className="back-link" to="/">
-          ← Back
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+          Back to sessions
         </Link>
-        <div className="session-id">Session: {session.session_id}</div>
+        <div className="session-id">{session.session_id}</div>
         <div className="session-actions">
           <button className="primary-btn" onClick={() => setShareOpen(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+              <polyline points="16,6 12,2 8,6" />
+              <line x1="12" y1="2" x2="12" y2="15" />
+            </svg>
             Share
           </button>
         </div>
         <div className="session-meta-line">
-          {session.tool} · {session.created_at}
+          <span className="tool-badge" data-tool={getToolId(session.tool)}>
+            {formatToolName(session.tool)}
+          </span>
+          <span>{formatTimestamp(session.created_at)}</span>
         </div>
-        <div className="session-meta-line">{session.cwd}</div>
+        {session.cwd && <div className="session-meta-line">{session.cwd}</div>}
         <div className="session-meta-line">
-          {messageCount} messages · {toolCount} tools
+          {messageCount} messages · {toolCount} tool calls
         </div>
       </header>
 
@@ -131,37 +142,56 @@ function SessionDetailView() {
         {items.map((item, idx) => {
           if (item.type === 'message') {
             return (
-              <div className="message-card" key={idx}>
+              <article
+                className="message-card"
+                key={idx}
+                style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+              >
                 <div className="role">{item.role === 'user' ? 'User' : 'Assistant'}</div>
-                {item.content ? <div className="message-content">{item.content}</div> : null}
+                {item.content && <div className="message-content">{item.content}</div>}
                 {item.thinking?.length ? (
                   <details className="thinking-block">
-                    <summary>Thinking</summary>
+                    <summary>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', verticalAlign: 'middle' }}>
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M12 16v-4M12 8h.01" />
+                      </svg>
+                      Thinking
+                    </summary>
                     <div className="thinking-content">{item.thinking.join('\n\n')}</div>
                   </details>
                 ) : null}
-              </div>
+              </article>
             )
           }
           return (
-            <div className={`tool-card${item.is_error ? ' error' : ''}`} key={idx}>
+            <article
+              className={`tool-card${item.is_error ? ' error' : ''}`}
+              key={idx}
+              style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+            >
               <div className="tool-title">
-                <span>Tool {item.tool_name}</span>
-                <span>{item.timestamp}</span>
+                <span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                  </svg>
+                  {item.tool_name}
+                </span>
+                <time>{formatTimestamp(item.timestamp)}</time>
               </div>
-              {item.input ? (
+              {item.input && (
                 <details open>
                   <summary>Input</summary>
                   <CodeBlock code={formatCode(item.input)} language="json" />
                 </details>
-              ) : null}
-              {item.output ? (
+              )}
+              {item.output && (
                 <details open>
                   <summary>Output</summary>
                   <CodeBlock code={formatCode(item.output)} language="json" />
                 </details>
-              ) : null}
-            </div>
+              )}
+            </article>
           )
         })}
       </div>
@@ -304,4 +334,27 @@ function parseTags(raw: string) {
       return { key: key.trim(), value: rest.join(':').trim() }
     })
     .filter((tag) => tag.key && tag.value)
+}
+
+function formatToolName(tool: string) {
+  const t = tool?.toLowerCase().replace(/-/g, '_') || ''
+  if (t === 'claude_code') return 'Claude'
+  if (t === 'cursor') return 'Cursor'
+  return tool?.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || ''
+}
+
+function getToolId(tool: string) {
+  return tool?.toLowerCase().replace(/[-\s]+/g, '_') || ''
+}
+
+function formatTimestamp(value: string | undefined) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
