@@ -1,0 +1,2 @@
+{"type":"assistant","message":{"role":"assistant","model":"claude-opus-4-5-20251101","content":[{"type":"text","text":"I will read the file for you."}]},"sessionId":"test-session","timestamp":"2026-01-01T12:00:01Z"}
+{"tool_use":{"id":"toolu_123","name":"Read","input":{"file_path":"/tmp/test.txt"}}}

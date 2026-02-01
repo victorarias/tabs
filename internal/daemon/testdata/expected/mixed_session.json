@@ -1,0 +1,68 @@
+[
+  {
+    "data": {
+      "content": [
+        {
+          "text": "What is the weather today?",
+          "type": "text"
+        }
+      ],
+      "role": "user"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:00Z",
+    "tool": "claude-code"
+  },
+  {
+    "data": {
+      "content": [
+        {
+          "text": "The user is asking about weather...",
+          "type": "thinking"
+        },
+        {
+          "text": "I don't have access to real-time weather data.",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-4-5-20251101",
+      "role": "assistant"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:01Z",
+    "tool": "claude-code"
+  },
+  {
+    "data": {
+      "content": [
+        {
+          "text": "Thanks!",
+          "type": "text"
+        }
+      ],
+      "role": "user"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:03Z",
+    "tool": "claude-code"
+  },
+  {
+    "data": {
+      "content": [
+        {
+          "text": "You're welcome!",
+          "type": "text"
+        }
+      ],
+      "model": "claude-opus-4-5-20251101",
+      "role": "assistant"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:04Z",
+    "tool": "claude-code"
+  }
+]

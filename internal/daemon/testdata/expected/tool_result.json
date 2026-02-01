@@ -1,0 +1,13 @@
+[
+  {
+    "data": {
+      "content": "file contents here",
+      "is_error": false,
+      "tool_use_id": "toolu_123"
+    },
+    "event_type": "tool_result",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T00:00:00Z",
+    "tool": "claude-code"
+  }
+]

@@ -1,0 +1,21 @@
+[
+  {
+    "data": {
+      "content": [
+        {
+          "text": "check this file",
+          "type": "text"
+        },
+        {
+          "text": "and this one too",
+          "type": "text"
+        }
+      ],
+      "role": "user"
+    },
+    "event_type": "message",
+    "session_id": "test-session",
+    "timestamp": "2026-01-01T12:00:00Z",
+    "tool": "claude-code"
+  }
+]

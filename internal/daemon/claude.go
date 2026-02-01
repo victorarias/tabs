@@ -254,14 +254,14 @@ func claudeEventsFromLine(line []byte, sessionID string, fallback time.Time) ([]
 	events := []map[string]interface{}{}
 
 	if role := claudeRole(record); role != "" {
-		content := normalizeContent(record["content"])
+		content := normalizeContent(extractMessageContent(record))
 		if len(content) > 0 {
 			data := map[string]interface{}{
 				"role":    role,
 				"content": content,
 			}
 			if role == "assistant" {
-				if model, ok := record["model"].(string); ok && model != "" {
+				if model := extractMessageModel(record); model != "" {
 					data["model"] = model
 				}
 			}
@@ -292,6 +292,31 @@ func claudeRole(record map[string]interface{}) string {
 		case "user", "assistant":
 			return value
 		}
+	}
+	return ""
+}
+
+func extractMessageContent(record map[string]interface{}) interface{} {
+	// Try nested message.content first (actual Claude Code transcript format)
+	if message, ok := record["message"].(map[string]interface{}); ok {
+		if content := message["content"]; content != nil {
+			return content
+		}
+	}
+	// Fallback to top-level content
+	return record["content"]
+}
+
+func extractMessageModel(record map[string]interface{}) string {
+	// Try nested message.model first
+	if message, ok := record["message"].(map[string]interface{}); ok {
+		if model, ok := message["model"].(string); ok && model != "" {
+			return model
+		}
+	}
+	// Fallback to top-level model
+	if model, ok := record["model"].(string); ok {
+		return model
 	}
 	return ""
 }

@@ -1,6 +1,6 @@
 # Makefile for tabs
 
-.PHONY: all build build-cli build-daemon build-server build-local test install clean
+.PHONY: all build build-cli build-daemon build-server build-local test test-unit test-integration test-golden test-golden-update install clean
 
 # Version
 VERSION ?= 0.1.0-dev
@@ -48,6 +48,22 @@ test-coverage:
 	go test -v -race -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
 
+test-unit:
+	@echo "Running unit tests..."
+	go test -v -race ./internal/daemon/... -run 'Test[^Integration]'
+
+test-integration:
+	@echo "Running integration tests..."
+	go test -v -race ./internal/daemon/... -run 'TestIntegration'
+
+test-golden:
+	@echo "Running golden file tests..."
+	go test -v ./internal/daemon/... -run 'Golden'
+
+test-golden-update:
+	@echo "Updating golden files..."
+	go test -v ./internal/daemon/... -run 'Golden' -update
+
 install: build
 	@echo "Installing binaries to $(PREFIX)/bin..."
 	@mkdir -p $(PREFIX)/bin
@@ -90,17 +106,21 @@ tidy:
 
 help:
 	@echo "Available targets:"
-	@echo "  build          - Build all binaries"
-	@echo "  build-cli      - Build tabs-cli only"
-	@echo "  build-daemon   - Build tabs-daemon only"
-	@echo "  build-server   - Build tabs-server only"
-	@echo "  test           - Run tests"
-	@echo "  test-coverage  - Run tests with coverage report"
-	@echo "  install        - Install binaries to PREFIX/bin (default: ~/.local/bin)"
-	@echo "  clean          - Remove build artifacts"
-	@echo "  dev-daemon     - Run daemon in development mode"
-	@echo "  dev-cli        - Run CLI in development mode"
-	@echo "  docker-build   - Build Docker image"
-	@echo "  lint           - Run linter"
-	@echo "  fmt            - Format code"
-	@echo "  tidy           - Tidy dependencies"
+	@echo "  build              - Build all binaries"
+	@echo "  build-cli          - Build tabs-cli only"
+	@echo "  build-daemon       - Build tabs-daemon only"
+	@echo "  build-server       - Build tabs-server only"
+	@echo "  test               - Run all tests"
+	@echo "  test-unit          - Run unit tests only"
+	@echo "  test-integration   - Run integration tests only"
+	@echo "  test-golden        - Run golden file tests"
+	@echo "  test-golden-update - Update golden files"
+	@echo "  test-coverage      - Run tests with coverage report"
+	@echo "  install            - Install binaries to PREFIX/bin (default: ~/.local/bin)"
+	@echo "  clean              - Remove build artifacts"
+	@echo "  dev-daemon         - Run daemon in development mode"
+	@echo "  dev-cli            - Run CLI in development mode"
+	@echo "  docker-build       - Build Docker image"
+	@echo "  lint               - Run linter"
+	@echo "  fmt                - Format code"
+	@echo "  tidy               - Tidy dependencies"

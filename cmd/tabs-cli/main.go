@@ -22,7 +22,6 @@ import (
 	cfgpkg "github.com/victorarias/tabs/internal/config"
 	"github.com/victorarias/tabs/internal/daemon"
 	"github.com/victorarias/tabs/internal/localserver"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -335,7 +334,7 @@ func runInstall(args []string) error {
 		installed = append(installed, path)
 	}
 
-	claudeConfigPath, err := installClaudeConfig(claudeCommand)
+	claudeSettingsPath, err := installClaudeSettings(claudeCommand)
 	if err != nil {
 		return err
 	}
@@ -348,8 +347,8 @@ func runInstall(args []string) error {
 	for _, path := range installed {
 		fmt.Printf(" - %s\n", path)
 	}
-	if claudeConfigPath != "" {
-		fmt.Printf("Updated Claude config: %s\n", claudeConfigPath)
+	if claudeSettingsPath != "" {
+		fmt.Printf("Updated Claude settings: %s\n", claudeSettingsPath)
 	}
 	if cursorConfigPath != "" {
 		fmt.Printf("Updated Cursor hooks: %s\n", cursorConfigPath)
@@ -366,55 +365,111 @@ func writeExecutable(path, content string, perm os.FileMode) error {
 	return os.Chmod(path, perm)
 }
 
-type claudeConfig struct {
-	Hooks map[string][]claudeHook `yaml:"hooks"`
+type claudeHookGroup struct {
+	Matcher string            `json:"matcher,omitempty"`
+	Hooks   []claudeHookEntry `json:"hooks"`
 }
 
-type claudeHook struct {
-	Command string `yaml:"command"`
+type claudeHookEntry struct {
+	Type    string `json:"type"`
+	Command string `json:"command"`
 }
 
-func installClaudeConfig(command string) (string, error) {
+func installClaudeSettings(command string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	configPath := filepath.Join(home, ".claude", "config.yaml")
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o700); err != nil {
+	settingsPath := filepath.Join(home, ".claude", "settings.json")
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o700); err != nil {
 		return "", err
 	}
 
-	cfg := claudeConfig{Hooks: map[string][]claudeHook{}}
-	if data, err := os.ReadFile(configPath); err == nil && len(bytes.TrimSpace(data)) > 0 {
-		if err := yaml.Unmarshal(data, &cfg); err != nil {
-			return "", fmt.Errorf("parse %s: %w", configPath, err)
+	settings := make(map[string]interface{})
+	if data, err := os.ReadFile(settingsPath); err == nil && len(bytes.TrimSpace(data)) > 0 {
+		if err := json.Unmarshal(data, &settings); err != nil {
+			return "", fmt.Errorf("parse %s: %w", settingsPath, err)
 		}
 	}
-	if cfg.Hooks == nil {
-		cfg.Hooks = map[string][]claudeHook{}
-	}
-	events := []string{"SessionStart", "SessionEnd", "ToolUse"}
-	for _, event := range events {
-		cfg.Hooks[event] = ensureClaudeHook(cfg.Hooks[event], command)
+
+	hooks, _ := settings["hooks"].(map[string]interface{})
+	if hooks == nil {
+		hooks = make(map[string]interface{})
 	}
 
-	out, err := yaml.Marshal(cfg)
+	events := []string{"SessionStart", "UserPromptSubmit", "Stop"}
+	for _, event := range events {
+		hooks[event] = ensureClaudeSettingsHook(hooks[event], command)
+	}
+	settings["hooks"] = hooks
+
+	out, err := json.MarshalIndent(settings, "", "  ")
 	if err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(configPath, out, 0o600); err != nil {
+	if err := os.WriteFile(settingsPath, out, 0o600); err != nil {
 		return "", err
 	}
-	return configPath, nil
+	return settingsPath, nil
 }
 
-func ensureClaudeHook(existing []claudeHook, command string) []claudeHook {
-	for _, hook := range existing {
-		if strings.TrimSpace(hook.Command) == command {
-			return existing
+func ensureClaudeSettingsHook(existing interface{}, command string) []claudeHookGroup {
+	var groups []claudeHookGroup
+	commandExists := false
+
+	// Parse existing hook groups
+	if arr, ok := existing.([]interface{}); ok {
+		for _, item := range arr {
+			if m, ok := item.(map[string]interface{}); ok {
+				if hasCommand(m, command) {
+					commandExists = true
+				}
+				group := claudeHookGroup{}
+				if matcher, ok := m["matcher"].(string); ok {
+					group.Matcher = matcher
+				}
+				if hooksArr, ok := m["hooks"].([]interface{}); ok {
+					for _, h := range hooksArr {
+						if hm, ok := h.(map[string]interface{}); ok {
+							entry := claudeHookEntry{}
+							if t, ok := hm["type"].(string); ok {
+								entry.Type = t
+							}
+							if c, ok := hm["command"].(string); ok {
+								entry.Command = c
+							}
+							group.Hooks = append(group.Hooks, entry)
+						}
+					}
+				}
+				groups = append(groups, group)
+			}
 		}
 	}
-	return append(existing, claudeHook{Command: command})
+
+	// Add new hook group if command doesn't exist
+	if !commandExists {
+		groups = append(groups, claudeHookGroup{
+			Hooks: []claudeHookEntry{{Type: "command", Command: command}},
+		})
+	}
+
+	return groups
+}
+
+func hasCommand(group map[string]interface{}, command string) bool {
+	hooksArr, ok := group["hooks"].([]interface{})
+	if !ok {
+		return false
+	}
+	for _, h := range hooksArr {
+		if hm, ok := h.(map[string]interface{}); ok {
+			if c, ok := hm["command"].(string); ok && strings.TrimSpace(c) == command {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type cursorHooks struct {

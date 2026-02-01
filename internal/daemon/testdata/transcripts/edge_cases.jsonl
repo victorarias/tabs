@@ -1,0 +1,4 @@
+{"type":"user","message":{"role":"user","content":""},"sessionId":"test-session","timestamp":"2026-01-01T12:00:00Z"}
+{"type":"user","message":{"role":"user","content":[]},"sessionId":"test-session","timestamp":"2026-01-01T12:00:01Z"}
+{"type":"unknown-type","data":{"foo":"bar"},"timestamp":"2026-01-01T12:00:02Z"}
+{"type":"user","message":{"role":"user","content":"valid message after edge cases"},"sessionId":"test-session","timestamp":"2026-01-01T12:00:03Z"}
