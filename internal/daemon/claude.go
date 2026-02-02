@@ -158,6 +158,11 @@ func (s *Server) appendClaudeTranscript(sessionPath, sessionID string, cursor *S
 
 	file, err := os.Open(cursor.TranscriptPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			// Transcript file doesn't exist yet (e.g., during SessionStart)
+			// Return success - cursor will be saved with transcript_path for later
+			return 0, time.Time{}, cursor.LastOffset, cursor.LastLineHash, nil
+		}
 		return 0, time.Time{}, cursor.LastOffset, cursor.LastLineHash, err
 	}
 	defer file.Close()
