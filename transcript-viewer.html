@@ -1,0 +1,1606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Transcript Viewer</title>
+
+    <!-- Marked.js for Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+    <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --border-primary: #30363d;
+            --border-secondary: #21262d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-purple: #a371f7;
+            --accent-orange: #d29922;
+            --accent-red: #f85149;
+            --accent-cyan: #39c5cf;
+            --user-bg: #1f3a5f;
+            --user-border: #2f5a8f;
+            --assistant-bg: #1c1c1c;
+            --thinking-bg: #1a1a2e;
+            --tool-bg: #0f1419;
+            --tool-header-bg: #161b22;
+            --subagent-bg: #1a1625;
+            --subagent-border: #3d2f5a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .logo-text {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .file-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-button, .select-wrapper select {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .file-button:hover, .select-wrapper select:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-blue);
+        }
+
+        .select-wrapper select {
+            min-width: 200px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8.5L1 3.5h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        .stats {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-value {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* Main content */
+        .main {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 80px 24px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            opacity: 0.5;
+        }
+
+        .path-helper {
+            margin-top: 32px;
+            padding: 16px 20px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            display: inline-block;
+            text-align: left;
+        }
+
+        .path-helper-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .path-helper-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .path-helper-path {
+            font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+            font-size: 13px;
+            color: var(--accent-cyan);
+            background-color: var(--bg-tertiary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            user-select: all;
+        }
+
+        .copy-btn {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .copy-btn:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-primary);
+            border-color: var(--accent-blue);
+        }
+
+        .copy-btn.copied {
+            background-color: var(--accent-green);
+            border-color: var(--accent-green);
+            color: white;
+        }
+
+        .path-helper-label kbd {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            border-radius: 3px;
+            padding: 2px 6px;
+            font-family: inherit;
+            font-size: 11px;
+            color: var(--text-primary);
+        }
+
+        .drop-zone {
+            margin-top: 24px;
+            padding: 40px;
+            border: 2px dashed var(--border-primary);
+            border-radius: 12px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: var(--accent-blue);
+            background-color: rgba(88, 166, 255, 0.05);
+        }
+
+        .drop-zone.drag-over {
+            transform: scale(1.02);
+        }
+
+        .drop-zone-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .drop-zone-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .drop-zone-text strong {
+            color: var(--accent-blue);
+        }
+
+        .open-finder-btn {
+            margin-top: 16px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .open-finder-btn:hover {
+            background-color: var(--bg-hover);
+            border-color: var(--accent-blue);
+        }
+
+        .drop-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(13, 17, 23, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .drop-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .drop-overlay-content {
+            text-align: center;
+            padding: 60px;
+            border: 3px dashed var(--accent-blue);
+            border-radius: 16px;
+            background-color: rgba(88, 166, 255, 0.1);
+        }
+
+        .drop-overlay-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .drop-overlay-text {
+            font-size: 24px;
+            color: var(--text-primary);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .toast-code {
+            font-family: 'SF Mono', 'Menlo', monospace;
+            background-color: var(--bg-tertiary);
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: var(--accent-cyan);
+        }
+
+        .empty-state h2 {
+            font-size: 24px;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+        }
+
+        .empty-state p {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        /* Messages */
+        .message {
+            margin-bottom: 24px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* User message */
+        .message-user {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message-user .message-content {
+            background-color: var(--user-bg);
+            border: 1px solid var(--user-border);
+            border-radius: 16px 16px 4px 16px;
+            padding: 12px 18px;
+            max-width: 80%;
+        }
+
+        .message-user .message-text {
+            color: var(--text-primary);
+        }
+
+        /* Assistant message */
+        .message-assistant .message-content {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 16px;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .message-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .message-label-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .message-body {
+            padding: 18px;
+        }
+
+        /* Text content */
+        .text-block {
+            margin-bottom: 16px;
+        }
+
+        .text-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .text-block p {
+            margin-bottom: 12px;
+        }
+
+        .text-block p:last-child {
+            margin-bottom: 0;
+        }
+
+        .text-block h1, .text-block h2, .text-block h3, .text-block h4 {
+            margin-top: 24px;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .text-block h1:first-child, .text-block h2:first-child,
+        .text-block h3:first-child, .text-block h4:first-child {
+            margin-top: 0;
+        }
+
+        .text-block ul, .text-block ol {
+            margin: 12px 0;
+            padding-left: 24px;
+        }
+
+        .text-block li {
+            margin-bottom: 6px;
+        }
+
+        .text-block code {
+            background-color: var(--bg-tertiary);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        .text-block pre {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        .text-block pre code {
+            background: none;
+            padding: 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .text-block a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        .text-block a:hover {
+            text-decoration: underline;
+        }
+
+        .text-block blockquote {
+            border-left: 3px solid var(--accent-purple);
+            padding-left: 16px;
+            margin: 16px 0;
+            color: var(--text-secondary);
+        }
+
+        /* Thinking block */
+        .thinking-block {
+            margin-bottom: 16px;
+        }
+
+        .thinking-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background-color: var(--thinking-bg);
+            border: 1px solid var(--border-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            width: 100%;
+            text-align: left;
+        }
+
+        .thinking-toggle:hover {
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+        }
+
+        .thinking-toggle .chevron {
+            transition: transform 0.2s;
+            font-size: 10px;
+        }
+
+        .thinking-toggle.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        .thinking-icon {
+            opacity: 0.7;
+        }
+
+        .thinking-content {
+            display: none;
+            margin-top: 8px;
+            padding: 14px;
+            background-color: var(--thinking-bg);
+            border: 1px solid var(--border-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            white-space: pre-wrap;
+        }
+
+        .thinking-content.visible {
+            display: block;
+        }
+
+        /* Tool use block */
+        .tool-block {
+            margin-bottom: 16px;
+            background-color: var(--tool-bg);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .tool-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+            background-color: var(--tool-header-bg);
+            border-bottom: 1px solid var(--border-secondary);
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .tool-header:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        .tool-header .chevron {
+            transition: transform 0.2s;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .tool-header.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        .tool-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .tool-icon.read { background-color: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .tool-icon.edit { background-color: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
+        .tool-icon.write { background-color: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
+        .tool-icon.bash { background-color: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
+        .tool-icon.grep { background-color: rgba(210, 153, 34, 0.2); color: var(--accent-orange); }
+        .tool-icon.glob { background-color: rgba(210, 153, 34, 0.2); color: var(--accent-orange); }
+        .tool-icon.task { background-color: rgba(57, 197, 207, 0.2); color: var(--accent-cyan); }
+        .tool-icon.webfetch { background-color: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .tool-icon.websearch { background-color: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+        .tool-icon.default { background-color: rgba(139, 148, 158, 0.2); color: var(--text-secondary); }
+
+        .tool-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .tool-summary {
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tool-body {
+            display: none;
+            padding: 14px;
+        }
+
+        .tool-body.visible {
+            display: block;
+        }
+
+        .tool-section {
+            margin-bottom: 14px;
+        }
+
+        .tool-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .tool-section-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .tool-params, .tool-output {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-secondary);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tool-output {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .tool-output.error {
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+        }
+
+        .tool-output.truncated::after {
+            content: '\n\n... (output truncated)';
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Subagent/Task block */
+        .subagent-block {
+            margin: 16px 0;
+            background-color: var(--subagent-bg);
+            border: 2px solid var(--subagent-border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .subagent-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            background-color: rgba(61, 47, 90, 0.3);
+            border-bottom: 1px solid var(--subagent-border);
+            cursor: pointer;
+        }
+
+        .subagent-header .chevron {
+            transition: transform 0.2s;
+            color: var(--accent-purple);
+        }
+
+        .subagent-header.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        .subagent-icon {
+            font-size: 18px;
+        }
+
+        .subagent-title {
+            font-weight: 600;
+            color: var(--accent-purple);
+        }
+
+        .subagent-prompt {
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .subagent-body {
+            display: none;
+            padding: 16px;
+        }
+
+        .subagent-body.visible {
+            display: block;
+        }
+
+        .subagent-messages {
+            border-left: 2px solid var(--subagent-border);
+            padding-left: 16px;
+            margin-left: 8px;
+        }
+
+        /* Tool result in user message */
+        .tool-result-block {
+            background-color: var(--tool-bg);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 12px;
+        }
+
+        .tool-result-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background-color: var(--tool-header-bg);
+            border-bottom: 1px solid var(--border-secondary);
+            cursor: pointer;
+        }
+
+        .tool-result-header .chevron {
+            transition: transform 0.2s;
+            color: var(--text-muted);
+            font-size: 10px;
+        }
+
+        .tool-result-header.expanded .chevron {
+            transform: rotate(90deg);
+        }
+
+        .tool-result-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .tool-result-body {
+            display: none;
+            padding: 14px;
+        }
+
+        .tool-result-body.visible {
+            display: block;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-primary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--bg-hover);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .file-controls {
+                flex-direction: column;
+            }
+
+            .select-wrapper select {
+                width: 100%;
+            }
+
+            .message-user .message-content {
+                max-width: 95%;
+            }
+
+            .main {
+                padding: 16px;
+            }
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border-primary);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">C</div>
+                <span class="logo-text">Claude Code Transcript Viewer</span>
+            </div>
+
+            <div class="file-controls">
+                <button class="file-button" onclick="openFinder()" title="Copy command to open folder in Terminal">&#128193; Finder</button>
+
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" class="file-input" accept=".jsonl,.json" multiple>
+                    <button class="file-button">Load Transcript(s)</button>
+                </div>
+
+                <div class="select-wrapper">
+                    <select id="fileSelect" disabled>
+                        <option value="">Select a transcript...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="stats" id="stats" style="display: none;">
+                <div class="stat">
+                    <span>Messages:</span>
+                    <span class="stat-value" id="statMessages">0</span>
+                </div>
+                <div class="stat">
+                    <span>Tool calls:</span>
+                    <span class="stat-value" id="statTools">0</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="main" id="main">
+        <div class="empty-state" id="emptyState">
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">&#128230;</div>
+                <div class="drop-zone-text">
+                    <strong>Drag & drop</strong> transcript files here<br>
+                    or click to browse
+                </div>
+            </div>
+
+            <button class="open-finder-btn" onclick="openFinder()">
+                &#128193; Open transcripts folder in Finder
+            </button>
+
+            <div class="path-helper">
+                <div class="path-helper-label">Or navigate manually: <kbd>Cmd+Shift+G</kbd> in file picker</div>
+                <div class="path-helper-box">
+                    <code class="path-helper-path">~/.claude/projects/</code>
+                    <button class="copy-btn" onclick="copyPath()" id="copyBtn">
+                        <span>&#128203;</span> Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="messages" style="display: none;"></div>
+    </main>
+
+    <div class="drop-overlay" id="dropOverlay">
+        <div class="drop-overlay-content">
+            <div class="drop-overlay-icon">&#128230;</div>
+            <div class="drop-overlay-text">Drop transcript files here</div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">
+        <div class="toast-title">Run this in Terminal:</div>
+        <code class="toast-code">open ~/.claude/projects</code>
+    </div>
+
+    <script>
+        // Configure marked
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    try {
+                        return hljs.highlight(code, { language: lang }).value;
+                    } catch (e) {}
+                }
+                return hljs.highlightAuto(code).value;
+            },
+            breaks: true,
+            gfm: true
+        });
+
+        // State
+        let transcripts = {};
+        let currentTranscript = null;
+
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const fileSelect = document.getElementById('fileSelect');
+        const messagesContainer = document.getElementById('messages');
+        const emptyState = document.getElementById('emptyState');
+        const stats = document.getElementById('stats');
+        const statMessages = document.getElementById('statMessages');
+        const statTools = document.getElementById('statTools');
+
+        // Event listeners
+        fileInput.addEventListener('change', handleFileSelect);
+        fileSelect.addEventListener('change', handleTranscriptSelect);
+
+        // Copy path to clipboard
+        function copyPath() {
+            const path = '~/.claude/projects/';
+            navigator.clipboard.writeText(path).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.classList.add('copied');
+                btn.innerHTML = '<span>&#10003;</span> Copied!';
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = '<span>&#128203;</span> Copy';
+                }, 2000);
+            });
+        }
+
+        // Open Finder to transcripts folder
+        function openFinder() {
+            const cmd = 'open ~/.claude/projects';
+            navigator.clipboard.writeText(cmd).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 4000);
+            });
+        }
+
+        // Drag and drop setup - whole page is drop zone
+        const dropZone = document.getElementById('dropZone');
+        const dropOverlay = document.getElementById('dropOverlay');
+
+        if (dropZone) {
+            dropZone.addEventListener('click', () => fileInput.click());
+        }
+
+        // Full page drag and drop
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            dropOverlay.classList.add('show');
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropOverlay.classList.remove('show');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropOverlay.classList.remove('show');
+            const files = Array.from(e.dataTransfer.files).filter(f =>
+                f.name.endsWith('.jsonl') || f.name.endsWith('.json')
+            );
+            if (files.length > 0) {
+                handleDroppedFiles(files);
+            }
+        });
+
+        // Click overlay to dismiss
+        dropOverlay.addEventListener('click', () => {
+            dropOverlay.classList.remove('show');
+            dragCounter = 0;
+        });
+
+        async function handleDroppedFiles(files) {
+            for (const file of files) {
+                try {
+                    const content = await readFile(file);
+                    const messages = parseJSONL(content);
+                    transcripts[file.name] = messages;
+
+                    if (!fileSelect.querySelector(`option[value="${file.name}"]`)) {
+                        const option = document.createElement('option');
+                        option.value = file.name;
+                        option.textContent = file.name;
+                        fileSelect.appendChild(option);
+                    }
+                } catch (e) {
+                    console.error(`Error loading ${file.name}:`, e);
+                    alert(`Error loading ${file.name}: ${e.message}`);
+                }
+            }
+
+            if (files.length > 0) {
+                fileSelect.disabled = false;
+                fileSelect.value = files[0].name;
+                renderTranscript(files[0].name);
+            }
+        }
+
+        // File handling
+        async function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+
+            for (const file of files) {
+                try {
+                    const content = await readFile(file);
+                    const messages = parseJSONL(content);
+                    transcripts[file.name] = messages;
+
+                    // Add to select if not already there
+                    if (!fileSelect.querySelector(`option[value="${file.name}"]`)) {
+                        const option = document.createElement('option');
+                        option.value = file.name;
+                        option.textContent = file.name;
+                        fileSelect.appendChild(option);
+                    }
+                } catch (e) {
+                    console.error(`Error loading ${file.name}:`, e);
+                    alert(`Error loading ${file.name}: ${e.message}`);
+                }
+            }
+
+            if (files.length > 0) {
+                fileSelect.disabled = false;
+                fileSelect.value = files[0].name;
+                renderTranscript(files[0].name);
+            }
+        }
+
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = e => reject(new Error('Failed to read file'));
+                reader.readAsText(file);
+            });
+        }
+
+        function parseJSONL(content) {
+            const lines = content.trim().split('\n');
+            const messages = [];
+
+            for (const line of lines) {
+                if (line.trim()) {
+                    try {
+                        messages.push(JSON.parse(line));
+                    } catch (e) {
+                        console.warn('Failed to parse line:', line);
+                    }
+                }
+            }
+
+            return messages;
+        }
+
+        function handleTranscriptSelect(event) {
+            const filename = event.target.value;
+            if (filename) {
+                renderTranscript(filename);
+            }
+        }
+
+        // Rendering
+        function renderTranscript(filename) {
+            const messages = transcripts[filename];
+            if (!messages) return;
+
+            currentTranscript = filename;
+            emptyState.style.display = 'none';
+            messagesContainer.style.display = 'block';
+            messagesContainer.innerHTML = '';
+
+            let messageCount = 0;
+            let toolCount = 0;
+
+            // Build a map of tool use IDs to their results
+            const toolResults = {};
+            for (const msg of messages) {
+                if (msg.type === 'user' && msg.message?.content) {
+                    const content = Array.isArray(msg.message.content) ? msg.message.content : [];
+                    for (const block of content) {
+                        if (block.type === 'tool_result') {
+                            toolResults[block.tool_use_id] = block;
+                        }
+                    }
+                }
+            }
+
+            for (const msg of messages) {
+                if (msg.type === 'user') {
+                    // Check if this is a tool result message or a real user message
+                    const content = msg.message?.content;
+                    if (Array.isArray(content)) {
+                        const hasToolResult = content.some(b => b.type === 'tool_result');
+                        const hasText = content.some(b => typeof b === 'string' || b.type === 'text');
+
+                        // Only render if it has actual user text (not just tool results)
+                        if (hasText && !hasToolResult) {
+                            messagesContainer.appendChild(renderUserMessage(msg));
+                            messageCount++;
+                        }
+                    } else if (typeof content === 'string' && content.trim()) {
+                        messagesContainer.appendChild(renderUserMessage(msg));
+                        messageCount++;
+                    }
+                } else if (msg.type === 'assistant') {
+                    const result = renderAssistantMessage(msg, toolResults);
+                    messagesContainer.appendChild(result.element);
+                    messageCount++;
+                    toolCount += result.toolCount;
+                }
+            }
+
+            stats.style.display = 'flex';
+            statMessages.textContent = messageCount;
+            statTools.textContent = toolCount;
+        }
+
+        function renderUserMessage(msg) {
+            const div = document.createElement('div');
+            div.className = 'message message-user';
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const text = document.createElement('div');
+            text.className = 'message-text';
+
+            const messageContent = msg.message?.content;
+            if (typeof messageContent === 'string') {
+                text.innerHTML = marked.parse(messageContent);
+            } else if (Array.isArray(messageContent)) {
+                const textParts = messageContent
+                    .filter(b => typeof b === 'string' || b.type === 'text')
+                    .map(b => typeof b === 'string' ? b : b.text)
+                    .join('\n');
+                text.innerHTML = marked.parse(textParts);
+            }
+
+            content.appendChild(text);
+            div.appendChild(content);
+            return div;
+        }
+
+        function renderAssistantMessage(msg, toolResults) {
+            const div = document.createElement('div');
+            div.className = 'message message-assistant';
+
+            const content = document.createElement('div');
+            content.className = 'message-content';
+
+            const label = document.createElement('div');
+            label.className = 'message-label';
+            label.innerHTML = '<div class="message-label-icon">C</div><span>Claude</span>';
+            content.appendChild(label);
+
+            const body = document.createElement('div');
+            body.className = 'message-body';
+
+            let toolCount = 0;
+            const messageContent = msg.message?.content || [];
+
+            for (const block of messageContent) {
+                if (block.type === 'thinking') {
+                    body.appendChild(renderThinkingBlock(block));
+                } else if (block.type === 'text') {
+                    body.appendChild(renderTextBlock(block));
+                } else if (block.type === 'tool_use') {
+                    const result = toolResults[block.id];
+                    body.appendChild(renderToolBlock(block, result));
+                    toolCount++;
+                }
+            }
+
+            content.appendChild(body);
+            div.appendChild(content);
+
+            return { element: div, toolCount };
+        }
+
+        function renderThinkingBlock(block) {
+            const div = document.createElement('div');
+            div.className = 'thinking-block';
+
+            const toggle = document.createElement('button');
+            toggle.className = 'thinking-toggle';
+            toggle.innerHTML = `
+                <span class="chevron">&#9654;</span>
+                <span class="thinking-icon">&#129504;</span>
+                <span>Thinking...</span>
+            `;
+
+            const content = document.createElement('div');
+            content.className = 'thinking-content';
+            content.textContent = block.thinking || '';
+
+            toggle.addEventListener('click', () => {
+                toggle.classList.toggle('expanded');
+                content.classList.toggle('visible');
+            });
+
+            div.appendChild(toggle);
+            div.appendChild(content);
+            return div;
+        }
+
+        function renderTextBlock(block) {
+            const div = document.createElement('div');
+            div.className = 'text-block';
+            div.innerHTML = marked.parse(block.text || '');
+            return div;
+        }
+
+        function renderToolBlock(block, result) {
+            const div = document.createElement('div');
+            div.className = 'tool-block';
+
+            const toolName = block.name || 'Unknown';
+            const iconClass = getToolIconClass(toolName);
+            const summary = getToolSummary(block);
+
+            const header = document.createElement('div');
+            header.className = 'tool-header';
+            header.innerHTML = `
+                <span class="chevron">&#9654;</span>
+                <div class="tool-icon ${iconClass}">${getToolIconLetter(toolName)}</div>
+                <span class="tool-name">${toolName}</span>
+                <span class="tool-summary">${escapeHtml(summary)}</span>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'tool-body';
+
+            // Parameters section
+            if (block.input && Object.keys(block.input).length > 0) {
+                const paramsSection = document.createElement('div');
+                paramsSection.className = 'tool-section';
+
+                const paramsLabel = document.createElement('div');
+                paramsLabel.className = 'tool-section-label';
+                paramsLabel.textContent = 'Parameters';
+
+                const paramsContent = document.createElement('pre');
+                paramsContent.className = 'tool-params';
+                paramsContent.innerHTML = highlightJSON(block.input);
+
+                paramsSection.appendChild(paramsLabel);
+                paramsSection.appendChild(paramsContent);
+                body.appendChild(paramsSection);
+            }
+
+            // Output section
+            if (result) {
+                const outputSection = document.createElement('div');
+                outputSection.className = 'tool-section';
+
+                const outputLabel = document.createElement('div');
+                outputLabel.className = 'tool-section-label';
+                outputLabel.textContent = result.is_error ? 'Error' : 'Output';
+
+                const outputContent = document.createElement('pre');
+                outputContent.className = 'tool-output' + (result.is_error ? ' error' : '');
+
+                let outputText = '';
+                if (typeof result.content === 'string') {
+                    outputText = result.content;
+                } else if (Array.isArray(result.content)) {
+                    outputText = result.content
+                        .map(c => typeof c === 'string' ? c : c.text || JSON.stringify(c))
+                        .join('\n');
+                }
+
+                // Truncate very long output
+                const maxLength = 10000;
+                if (outputText.length > maxLength) {
+                    outputText = outputText.substring(0, maxLength);
+                    outputContent.classList.add('truncated');
+                }
+
+                outputContent.textContent = outputText;
+
+                outputSection.appendChild(outputLabel);
+                outputSection.appendChild(outputContent);
+                body.appendChild(outputSection);
+            }
+
+            // Handle Task tool (subagent) specially
+            if (toolName === 'Task' && result) {
+                const subagentResult = parseSubagentResult(result);
+                if (subagentResult) {
+                    body.innerHTML = '';
+                    body.appendChild(renderSubagentBlock(block, subagentResult));
+                }
+            }
+
+            header.addEventListener('click', () => {
+                header.classList.toggle('expanded');
+                body.classList.toggle('visible');
+            });
+
+            div.appendChild(header);
+            div.appendChild(body);
+            return div;
+        }
+
+        function parseSubagentResult(result) {
+            // Try to extract subagent conversation from result
+            // This is a simplified version - real implementation would parse the nested structure
+            return null; // Placeholder for now
+        }
+
+        function renderSubagentBlock(block, subagentData) {
+            const div = document.createElement('div');
+            div.className = 'subagent-block';
+
+            const prompt = block.input?.prompt || block.input?.description || 'Subagent task';
+
+            const header = document.createElement('div');
+            header.className = 'subagent-header';
+            header.innerHTML = `
+                <span class="chevron">&#9654;</span>
+                <span class="subagent-icon">&#129302;</span>
+                <span class="subagent-title">Subagent</span>
+                <span class="subagent-prompt">${escapeHtml(prompt)}</span>
+            `;
+
+            const body = document.createElement('div');
+            body.className = 'subagent-body';
+
+            // Render nested messages if available
+            const messagesDiv = document.createElement('div');
+            messagesDiv.className = 'subagent-messages';
+            messagesDiv.innerHTML = '<em style="color: var(--text-muted);">Subagent conversation details...</em>';
+            body.appendChild(messagesDiv);
+
+            header.addEventListener('click', () => {
+                header.classList.toggle('expanded');
+                body.classList.toggle('visible');
+            });
+
+            div.appendChild(header);
+            div.appendChild(body);
+            return div;
+        }
+
+        // Utility functions
+        function getToolIconClass(toolName) {
+            const name = toolName.toLowerCase();
+            if (name === 'read') return 'read';
+            if (name === 'edit') return 'edit';
+            if (name === 'write') return 'write';
+            if (name === 'bash') return 'bash';
+            if (name === 'grep') return 'grep';
+            if (name === 'glob') return 'glob';
+            if (name.includes('task')) return 'task';
+            if (name === 'webfetch') return 'webfetch';
+            if (name === 'websearch') return 'websearch';
+            return 'default';
+        }
+
+        function getToolIconLetter(toolName) {
+            const name = toolName.toLowerCase();
+            if (name === 'read') return 'R';
+            if (name === 'edit') return 'E';
+            if (name === 'write') return 'W';
+            if (name === 'bash') return '$';
+            if (name === 'grep') return 'G';
+            if (name === 'glob') return '*';
+            if (name.includes('task')) return 'T';
+            if (name === 'webfetch') return 'F';
+            if (name === 'websearch') return 'S';
+            return toolName.charAt(0).toUpperCase();
+        }
+
+        function getToolSummary(block) {
+            const input = block.input || {};
+            const name = (block.name || '').toLowerCase();
+
+            if (name === 'read' && input.file_path) {
+                return input.file_path.split('/').pop();
+            }
+            if (name === 'edit' && input.file_path) {
+                return input.file_path.split('/').pop();
+            }
+            if (name === 'write' && input.file_path) {
+                return input.file_path.split('/').pop();
+            }
+            if (name === 'bash' && input.command) {
+                const cmd = input.command;
+                return cmd.length > 60 ? cmd.substring(0, 60) + '...' : cmd;
+            }
+            if (name === 'grep' && input.pattern) {
+                return `/${input.pattern}/`;
+            }
+            if (name === 'glob' && input.pattern) {
+                return input.pattern;
+            }
+            if (name === 'websearch' && input.query) {
+                return input.query;
+            }
+            if (name === 'webfetch' && input.url) {
+                return input.url;
+            }
+
+            return '';
+        }
+
+        function highlightJSON(obj) {
+            const json = JSON.stringify(obj, null, 2);
+            return hljs.highlight(json, { language: 'json' }).value;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Demo data for testing
+        function loadDemoData() {
+            const demoTranscript = [
+                {
+                    type: 'user',
+                    message: {
+                        content: 'Can you help me create a simple Python function to calculate fibonacci numbers?'
+                    }
+                },
+                {
+                    type: 'assistant',
+                    message: {
+                        content: [
+                            {
+                                type: 'thinking',
+                                thinking: 'The user wants a fibonacci function. I should provide both an iterative and recursive solution, explaining the tradeoffs. The iterative approach is more efficient for larger numbers.'
+                            },
+                            {
+                                type: 'text',
+                                text: "I'll create a Python function for calculating Fibonacci numbers. Here's an efficient iterative implementation:\n\n```python\ndef fibonacci(n):\n    if n <= 0:\n        return 0\n    elif n == 1:\n        return 1\n    \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n```\n\nThis implementation has **O(n)** time complexity and **O(1)** space complexity."
+                            },
+                            {
+                                type: 'tool_use',
+                                id: 'tool_1',
+                                name: 'Write',
+                                input: {
+                                    file_path: '/tmp/fibonacci.py',
+                                    content: 'def fibonacci(n):\n    if n <= 0:\n        return 0\n    elif n == 1:\n        return 1\n    \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n\n# Test\nfor i in range(10):\n    print(f"fib({i}) = {fibonacci(i)}")'
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    type: 'user',
+                    message: {
+                        content: [
+                            {
+                                type: 'tool_result',
+                                tool_use_id: 'tool_1',
+                                content: 'File written successfully.'
+                            }
+                        ]
+                    }
+                },
+                {
+                    type: 'assistant',
+                    message: {
+                        content: [
+                            {
+                                type: 'text',
+                                text: "I've written the file. Let me run it to verify it works correctly."
+                            },
+                            {
+                                type: 'tool_use',
+                                id: 'tool_2',
+                                name: 'Bash',
+                                input: {
+                                    command: 'python /tmp/fibonacci.py',
+                                    description: 'Run the fibonacci script to test it'
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
+                    type: 'user',
+                    message: {
+                        content: [
+                            {
+                                type: 'tool_result',
+                                tool_use_id: 'tool_2',
+                                content: 'fib(0) = 0\nfib(1) = 1\nfib(2) = 1\nfib(3) = 2\nfib(4) = 3\nfib(5) = 5\nfib(6) = 8\nfib(7) = 13\nfib(8) = 21\nfib(9) = 34'
+                            }
+                        ]
+                    }
+                },
+                {
+                    type: 'assistant',
+                    message: {
+                        content: [
+                            {
+                                type: 'text',
+                                text: "The function works correctly. The output shows the classic Fibonacci sequence: 0, 1, 1, 2, 3, 5, 8, 13, 21, 34.\n\nWould you like me to add any additional features, such as:\n- Memoization for recursive calls\n- Generator version for memory efficiency with large sequences\n- Input validation"
+                            }
+                        ]
+                    }
+                }
+            ];
+
+            transcripts['demo.jsonl'] = demoTranscript;
+
+            const option = document.createElement('option');
+            option.value = 'demo.jsonl';
+            option.textContent = 'demo.jsonl (sample)';
+            fileSelect.appendChild(option);
+            fileSelect.disabled = false;
+            fileSelect.value = 'demo.jsonl';
+
+            renderTranscript('demo.jsonl');
+        }
+
+        // Load demo on startup
+        loadDemoData();
+    </script>
+</body>
+</html>
